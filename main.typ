@@ -40,4 +40,12 @@ Pipelining is an implementation technique that exploits *parallelism* among the 
 All RISC architectures are characterized by a few key properties:
 - All operations on data apply to data in registers and typically change the entire register(32 or 64 bits).
 - The only operations that affect memory are *load* and *store* operations that move data from memory to a register or to memory from a register, respectively.
-- The instruction formats are few in number, with all instructions typically being one size. In RISC V, the register specifiers: rs1, rs2, and rd are always in the same place simplifying the control.
+- The instruction formats are few in number, with all instructions typically being one size. In RISC V, the register specifiers: *rs1*, *rs2*, and *rd* are always in the same place simplifying the control.
+
+== A Simple Implementation of a RISC Instruction Set
+Every instruction in this RISC subset can be implemented in, at most, 5 clock cycles. The 5 clock cycles are as follows.
++ _Instruction Fetch(IF)_: Send the program counter (PC) to memory and fetch the current instruction from memory. Update the PC to the next *sequential instruction* by adding 4 (because each instruction is 4 bytes) to the PC.
++ _Instruction decode/register fetch cycle (ID)_: Decode the instruction and read the registers corresponding to register source specifiers from the register file. Do the equality test on the registers as they are read, for a possible branch. Sign-extend the offset field of the instruction in case it is needed. Compute the possible branch target address by adding the sign-extended offset to the incremented PC.
++ _Execution/effective address cycle (EX)_: The ALU operates on the operands prepared in the prior cycle, performing one of three functions, depending on the instruction type.
++ _Memory access (MEM)_: If the instruction is a load, the memory does a read using the effective address computed in the previous cycle. If it is a store, then the memory writes the data from the second register read from the register file using the effective address.
++ _Write-back cycle (WB)_: Write the result into the register file, whether it comes from the memory system (for a load) or from the ALU (for an ALU instruction).
