@@ -112,3 +112,16 @@ Every instruction in this RISC subset can be implemented in, at most, 5 clock cy
 + _Execution/effective address cycle (EX)_: The ALU operates on the operands prepared in the prior cycle, performing one of three functions, depending on the instruction type.
 + _Memory access (MEM)_: If the instruction is a load, the memory does a read using the effective address computed in the previous cycle. If it is a store, then the memory writes the data from the second register read from the register file using the effective address.
 + _Write-back cycle (WB)_: Write the result into the *register file*, whether it comes from the memory system (for a load) or from the ALU (for an ALU instruction).
+
+== Implementation of RISC-V processor --- Data Path
+The *Instruction Memory*(read-only memory) is separated from *Data Memory*. 32 General-Purpose Registers organized in a *Register File(RF)* with 2 read ports and 1 write port.
+
+#figure(
+  image("figures/basic-implementation-risc-datapath.jpg", width: 80%),
+  caption: "Basic Implementation of a RISC Instruction Set",
+)
+
+#figure(
+  image("figures/implementation-risc-datapath.jpg", width: 80%),
+  caption: "A complete implementation of RISC-V data path",
+)
