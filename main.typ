@@ -125,3 +125,45 @@ The *Instruction Memory*(read-only memory) is separated from *Data Memory*. 32 G
   image("figures/implementation-risc-datapath.jpg", width: 80%),
   caption: "A complete implementation of RISC-V data path",
 )
+
+== RISC-V Pipelining
+Pipelining is a performance optimization technique based on the *overlap* of the execution of multiple instructions deriving from a sequential execution flow. Pipelining exploits *instruction parallelism* in a sequential instruction stream.
+
+Sequential is slower than pipeline. The following figure shows the difference (in terms of clock cycles) between sequential and pipeline.
+
+#figure(
+  image("figures/sequential-vs-pipelining-1.jpg", width: 70%),
+  caption: "Sequential vs Pipeline",
+)
+
+The time to advance the instruction of one stage in the pipeline corresponds to a *clock cycle*. The total cost is: 9 clock cycles.
+
+The pipeline stages must be synchronized, the duration of a clock cycle is defined by the time requested by the *slower stage* of the pipeline. The goal is to balance the length of each pipeline stage. If the stages are perfectly balanced, the *ideal speedup* due to pipelining is equal to the number of pipeline stages.
+
+The sequential and pipelining cases consist of 5 instructions, each of which is divided into 5 low-level instructions of 2 ns each.
+- The *latency* (total execution time) of each instruction is not varied, it's always 10 ns.
+- The *throughput* (number of low-level instructions completed in the time unit) is improved:
+  - Sequential: 1 instruction completed every 10 ns
+  - Pipelining: 1 instruction completed every 2 ns
+
+We want to perform the following assembly lines:
+```asm
+  op $x , $y , $z       # assume $x <- $y + $z
+  lw $x , offset ($y)   # $x <- M[$y + offset ]
+  sw $x , offset ($y)   # M[$y + offset ] <- $x
+  beq $x , $y , offset
+```
+
+#figure(
+  image("figures/pipeline_execution.jpg", width: 80%),
+  caption: [ Pipeline Execution of RISC-V Instructions ],
+)
+
+== Resources used during the pipeline execution
+*IM* is Instruction Memory, *REG* is Register File and *DM* is Data Memory.
+
+#figure(
+  image("figures/resource_used_pipeline.jpg", width: 80%),
+  caption: [Resources used during the pipeline execution ],
+)
+
