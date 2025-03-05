@@ -1,6 +1,6 @@
-#import "@preview/ctheorems:1.1.2": *
-#import "@preview/showybox:2.0.1": showybox
-#import "@preview/codelst:2.0.1": sourcecode
+#import "@preview/ctheorems:1.1.3": *
+#import "@preview/showybox:2.0.4": showybox
+#import "@preview/codelst:2.0.2": sourcecode
 #import "resource.typ": *
 
 #let template(
@@ -19,10 +19,10 @@
   let accent-color = rgb(accent)
   show: thmrules
 
-  // 设置文档元数据
+  // set metadata
   set document(title: title, author: authors.map(author => author.name))
 
-  // 将链接设置蓝色并加下划线，并且对于作者列表禁用此设置。
+  // Set the link color to blue and add an underline, and disable this setting for the author list.
   show link: it => {
     let author-names = ()
     for author in authors {
@@ -35,64 +35,67 @@
     }
   }
 
-  // 计数器
+  // counter
   let chaptercounter = counter("chapter")
 
-  // 设置页面
+  // set page
   set page(
     paper: page-size,
     numbering: "1 / 1",
     number-align: center,
 
-    // 页边距
-    margin: (x:1.6cm, y:2.3cm),
+    // set margin
+    margin: (x: 1.6cm, y: 2.3cm),
 
-    // 封面图片和背景图片
-    background: locate(loc => {
+    // set background
+    background: context {
+      let loc = here()
       if loc.page() == 1 and cover-image != none {
-        block(width:100%, height: 100%)[#image(cover-image, width: 40%)]
-      } else if background-color != none{
-        block(width:100%, height:100%, fill: rgb(background-color))
+        block(width: 100%, height: 100%)[#image(cover-image, width: 40%)]
+      } else if background-color != none {
+        block(width: 100%, height: 100%, fill: rgb(background-color))
       }
-    }),
+    },
 
-    // 页眉
-    header: locate(loc => {
-      if loc.page() == 1{return}
+    // set header
+    header: context {
+      let loc = here()
+      if loc.page() == 1 { return }
       let elems = query(heading.where(level: 1).after(loc))
       let chapter-title = ""
-      if(elems == () or elems.first().location().page() != loc.page()){
+      if (elems == () or elems.first().location().page() != loc.page()) {
         let elems = query(heading.where(level: 1).before(loc))
         chapter-title = elems.last().body
-      }else{
+      } else {
         chapter-title = elems.first().body
       }
       let head-title = text()[
-        #if short-title != none {short-title} else {title}
+        #if short-title != none { short-title } else { title }
       ]
       if calc.even(loc.page()) == true {
         emph(chapter-title) + h(1fr) + emph(head-title)
-      }else{
+      } else {
         emph(head-title) + h(1fr) + emph(chapter-title)
       }
       v(-8pt)
       align(center)[#line(length: 105%, stroke: (thickness: 1pt, dash: "solid"))]
-    }),
+    },
 
-    // 页脚
-    footer: locate(loc => {
+    // footer
+    footer: context {
+      let loc = here()
       if loc.page() == 1 { return }
       [
         #if calc.even(loc.page()) == true {
-          align(center)[#counter(page).display("1 / 1",both: true,)]
+          align(center)[#counter(page).display("1 / 1", both: true)]
         } else {
-          align(center)[#counter(page).display("1 / 1",both: true,)]
+          align(center)[#counter(page).display("1 / 1", both: true)]
         }
       ]
-    })
+    },
   )
 
-  // 配置列表
+  // set list
   set list(tight: true, indent: 1em)
   show list: it => [
     #set text(top-edge: "ascender")
@@ -104,11 +107,13 @@
     #it
   ]
 
-  // 配置标题
+  // 配set heading
   let level = 3
-  set heading(numbering: (..numbers) => if numbers.pos().len() <= level {
-    return numbering("1.1.1.1", ..numbers)
-  })
+  set heading(
+    numbering: (..numbers) => if numbers.pos().len() <= level {
+      return numbering("1.1.1.1", ..numbers)
+    },
+  )
 
 
   show heading: it => box(width: 100%)[
@@ -123,7 +128,7 @@
     }
   ]
 
-  // 配置一级标题
+  // set heading(numbering: "1 ")
   show heading.where(level: 1): it => box(width: 100%)[
     #set align(center)
     #set text(fill: accent-color)
@@ -133,7 +138,7 @@
     #line(length: 100%, stroke: gray)
   ]
 
-  // 设置段落
+  // set paragraph
   set par(
     leading: 1em,
     first-line-indent: 1.8em,
@@ -141,27 +146,33 @@
     linebreaks: "optimized",
   )
 
-  // 设置正文字体
+  // set font
   set text(font: "New Computer Modern", size: 12pt)
 
-  // 设置代码字体
+  // set code font
   show raw: set text(font: "DroidSansM Nerd Font", size: 10pt)
 
-  // 配置公式的编号和间距
-  set math.equation(numbering: (..nums) => locate(loc => {
-    numbering("(1.1)", chaptercounter.at(loc).first(), ..nums)
-  }))
+  // Numbering and spacing of configuration formulas
+  set math.equation(
+    numbering: (..nums) => context {
+      let loc = here()
+      numbering("(1.1)", chaptercounter.at(loc).first(), ..nums)
+    },
+  )
   show math.equation: eq => {
     set block(spacing: 0.65em)
     eq
   }
 
-  // 配置图像和图像编号
-  set figure(numbering: (..nums) => locate(loc => {
-    numbering("1.1", chaptercounter.at(loc).first(), ..nums)
-  }))
+  // Set figure numbering
+  set figure(
+    numbering: (..nums) => context {
+      let loc = here()
+      numbering("1.1", chaptercounter.at(loc).first(), ..nums)
+    },
+  )
 
-  // 配置表格
+  // set table
   set table(
     fill: (_, row) => if row == 0 {
       accent-color.lighten(40%)
@@ -178,15 +189,12 @@
     it
   }
 
-  // 配置行内代码块
+  // set inline code blocks
   show raw.where(block: false): it => box(fill: luma(245), inset: (x: 2pt), outset: (y: 3pt), radius: 1pt)[#it]
-
   show raw.where(block: true): it => sourcecode[#it]
-  // 显示
-
 
   box(width: 100%, height: 40%)[
-    // 显示论文的标题和描述。
+    // Display the title and description of the paper.
     #align(right + bottom)[
       #text(24pt, weight: "bold")[#title]
       #parbreak()
@@ -204,26 +212,26 @@
           {
             authors
               .map(author => {
-                  text(16pt, weight: "semibold")[
-                    #if "homepage" in author {
-                      [#link(author.homepage)[#author.name]]
-                    } else {
-                      author.name
-                    }]
-                  if "affiliations" in author {
-                    super(author.affiliations)
-                  }
-                })
-              .join(
-              ", ",
-              last: {
-                if authors.len() > 2 {
-                  ", and"
-                } else {
-                  " and"
+                text(16pt, weight: "semibold")[
+                  #if "homepage" in author {
+                    [#link(author.homepage)[#author.name]]
+                  } else {
+                    author.name
+                  }]
+                if "affiliations" in author {
+                  super(author.affiliations)
                 }
-              },
-            )
+              })
+              .join(
+                ", ",
+                last: {
+                  if authors.len() > 2 {
+                    ", and"
+                  } else {
+                    " and"
+                  }
+                },
+              )
           },
         )
       }
@@ -234,10 +242,10 @@
           {
             affiliations
               .map(affiliation => {
-                  text(12pt)[
-                    #h(1pt)#affiliation.name
-                  ]
-                })
+                text(12pt)[
+                  #h(1pt)#affiliation.name
+                ]
+              })
               .join(", ")
           },
         )
@@ -245,7 +253,7 @@
     ]
   ]
 
-  // 显示编辑日期
+  // show edit date
   box(width: 100%)[
     #align(right + bottom)[
       #if date != none {
@@ -265,20 +273,22 @@
           datetime.today().display("[year]-[month]-[day]"),
         )
       } else {
-        text(size: 11pt)[Last updated at: #h(5pt)] + text(
-          size: 11pt,
-          fill: accen-color,
-          weight: "semibold",
-          datetime.today().display("[month repr:long] [day padding:zero], [year repr:full]"),
+        (
+          text(size: 11pt)[Last updated at: #h(5pt)]
+            + text(
+              size: 11pt,
+              fill: accen-color,
+              weight: "semibold",
+              datetime.today().display("[month repr:long] [day padding:zero], [year repr:full]"),
+            )
         )
       }
     ]
   ]
 
-  // 换页
   pagebreak()
 
-  // 显示笔记的目录
+  // show table of contents
   outline(
     indent: auto,
     depth: 2,
@@ -286,7 +296,6 @@
 
   v(24pt, weak: true)
 
-  // 换页
   pagebreak()
 
   body
@@ -306,10 +315,8 @@
   ]
 ]
 
-// 水平标尺
+// Horizontal ruler
 #let horizontalrule = [#v(0.5em) #line(start: (20%, 0%), end: (80%, 0%)) #v(0.5em)]
-
-// 另外的水平标尺
 #let sectionline = align(center)[#v(0.5em) * \* #sym.space.quad \* #sym.space.quad \* * #v(0.5em)]
 
 #let boxnumbering = "1.1.1.1.1.1"
@@ -340,7 +347,7 @@
   2, // number of base number levels to use
   (name, number, body) => {
     notebox(name, number, body, "definition", defSvg, orange)
-  }
+  },
 ).with(numbering: boxnumbering)
 
 #let example = thmenv(
