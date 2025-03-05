@@ -1,8 +1,8 @@
-#import "./template.typ": *
 #import "@preview/codelst:2.0.1": sourcecode
 #import "@preview/lovelace:0.3.0": *
+#import "@local/simple-note:0.0.1": *
 
-#show: template.with(
+#show: simple-note.with(
   title: [ Advanced Computer Architecture ],
   date: datetime(year: 2025, month: 2, day: 17),
   authors: (
