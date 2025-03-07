@@ -46,20 +46,19 @@ As shown in the @fig:risc-v-registers, the width of these registers is defined b
   caption: [ RISC-V Registers @RegistersRISCVWikiChip],
 ) <fig:risc-v-registers>
 
+== Five classic components of a computer
+The five classic components are shown in the @fig:five-classic-components. The five components perform the tasks of *inputting, outputting, processing and storing data*.
 
-== The Processor Performance Equation
-Essentially all computers are constructed using a clock running at a constant rate. These discrete time events are called _clock periods, clocks, cycles,or clock cycles_. Computer designers refer to the time of a clock period by its duration (e.g., 1 ns) or by its rate (e.g., 1 GHz). CPU time for a program can then be expressed two ways:
-$
-  "CPU time" = "CPU clock cycles for a program" times "Clock cycle time"
-$
-Or
-$
-  "CPU time" = "CPU clock cycles for a program" / "Clock rate"
-$
-In addition to the number of clock cycles needed to execute a program, we can also count the number of instructions executed---the _instruction path length_ or _instruction count_ (IC). If we know the number of clock cycles and the instruction count, we can calculate the average number of _clock cycles per instruction_(CPI). CPI is computed as:
-$
-  "CPI" = "CPU clock cycles for a program" / "Instruction count"
-$
+#figure(
+  image("figures/five-classic-components.jpg", width: 80%),
+  caption: [ Five classic components of a computer],
+) <fig:five-classic-components>
+
+The five classic components of a computer are *input, output, memory, datapath, and control*, with the last two sometimes combined and called the processor.
+- The *processor* gets instructions and data from memory.
+- *Input* writes data to memory, and *output* reads data from memory.
+- *Control* sends the signals that determine the operations of the datapath, memory, input, and output.
+
 
 #pagebreak()
 
@@ -126,8 +125,19 @@ Every instruction in this RISC subset can be implemented in, at most, *5 clock c
 + _Memory access (MEM)_: If the instruction is a load, the memory does a read using the effective address computed in the previous cycle. If it is a store, then the memory writes the data from the second register read from the register file using the effective address.
 + _Write-back cycle (WB)_: Write the result into the *register file*, whether it comes from the memory system (for a load) or from the ALU (for an ALU instruction).
 
-== Implementation of RISC-V processor --- Data Path
+== Implementation of RISC-V processor
 The *Instruction Memory*(read-only memory) is separated from *Data Memory*. 32 General-Purpose Registers organized in a *Register File(RF)* with 2 read ports and 1 write port.
+
+For every instruction, the first two steps are identical:
++ Send the *_program counter (PC)_* to the memory that contains the code and fetch the instruction from that memory.
++ *Read one or two registers*, using fields of the instruction to select the registers to read. For the `ld` instruction, we need to read only one register, but most other instructions require reading two registers.
+
+Fortunately,for each of the three instruction classes(memory-reference,arithmetic-logical, and branches), the actions are largely the same, independent of the exact instruction:
+
+For example, all instruction classes use the *arithmetic-logical unit* (ALU) after reading the registers.
+- For the *memory-reference* instructions, the ALU computes the effective address by adding the offset to the base register.
+- For the *arithmetic-logical* instructions, the ALU performs the operation specified by the instruction.
+- For the *branch* instructions, the ALU compares the two registers to determine if the branch should be taken(*equality test*).
 
 #figure(
   image("figures/basic-implementation-risc-datapath.jpg", width: 80%),
@@ -180,4 +190,19 @@ We want to perform the following assembly lines:
   caption: [Resources used during the pipeline execution ],
 )
 
+== The Processor Performance Equation
+Essentially all computers are constructed using a clock running at a constant rate. These discrete time events are called _clock periods, clocks, cycles,or clock cycles_. Computer designers refer to the time of a clock period by its duration (e.g., 1 ns) or by its rate (e.g., 1 GHz). CPU time for a program can then be expressed two ways:
+$
+  "CPU time" = "CPU clock cycles for a program" times "Clock cycle time"
+$
+Or
+$
+  "CPU time" = "CPU clock cycles for a program" / "Clock rate"
+$
+In addition to the number of clock cycles needed to execute a program, we can also count the number of instructions executed---the _instruction path length_ or _instruction count_ (IC). If we know the number of clock cycles and the instruction count, we can calculate the average number of _clock cycles per instruction_(CPI). CPI is computed as:
+$
+  "CPI" = "CPU clock cycles for a program" / "Instruction count"
+$
+
 #bibliography("references.bib")
+
