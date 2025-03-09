@@ -25,6 +25,8 @@
 #set math.vec(delim: "[")
 #set math.equation(supplement: [Eq.])
 
+#let nonum(eq) = math.equation(block: true, numbering: none, eq)
+
 = Fundamental Concepts
 == Classes of Parallelism and Parallel Architectures
 There are basically two kinds of parallelism in *applications*:
@@ -59,6 +61,56 @@ The five classic components of a computer are *input, output, memory, datapath, 
 - *Input* writes data to memory, and *output* reads data from memory.
 - *Control* sends the signals that determine the operations of the datapath, memory, input, and output.
 
+== The CPU Performance
+Essentially all computers are constructed using a clock running at a constant rate. These discrete time events are called _clock periods, clocks, cycles,or clock cycles_. Computer designers refer to the time of a clock period by its duration (e.g., 1 ns) or by its rate (e.g., 1 GHz). CPU time for a program can then be expressed two ways:
+$
+  "CPU time" = "CPU clock cycles for a program" times "Clock cycle time"
+$
+Alternatively, because clock rate and clock cycle time are inverses,
+$
+  "CPU time" = "CPU clock cycles for a program" / "Clock rate"
+$
+#example("Improving Performance")[
+  Our favorite program runs in 10 seconds on computer A, which has a 2 GHz clock. We are trying to help a computer designer build a computer, B, which will run this program in 6 seconds. The designer has determined that a substantial increase in the clock rate is possible, but this increase will affect the rest of the CPU design, causing computer B to require 1.2 times as many clock cycles as computer A for this program.
+
+  What clock rate should we tell the designer to target?
+
+  Find the number of clock cycles for computer A:
+  #nonum($
+    "CPU time"_A =& "CPU clock cycles for a program"_A / "Clock rate"_A \
+    10 =& "CPU clock cycles for a program"_A / (2 times 10^9) \
+  $)
+  #nonum($
+    "CPU clock cycles"_A =& 20 times 10^9
+  $)
+
+  CPU time for B can be found using this equation:
+  #nonum($
+    "CPU time"_B =& "CPU clock cycles for a program"_B / "Clock rate"_B \
+    6 =& 1.2 times "CPU clock cycles for a program"_A / "Clock rate"_B \
+  $)
+  #nonum($
+    "Clock rate"_B=& (1.2 times 20 times 10^9) / 6 = 4 "Ghz"
+  $)
+]
+
+== Instruction Performance
+One way to think about execution time is that it equals the number of instructions executed multiplied by the average time per instruction. Therefore, the number of clock cycles required for a program can be written as *CPI* is computed as:
+$
+  "CPU clock cycles" = "Instructions fora program" times "Average cycles per instruction"
+$
+The term clock cycles per instruction, which is the average number of clock cycles each instruction takes to execute, is often abbreviated as *CPI*.
+$
+  "CPI" = "CPU clock cycles" / "Instructions for a program"
+$
+We can now write this basic performance equation in terms of instruction count (the number of instructions executed by the program), CPI, and clock cycle time:
+$
+  "CPU time" = "Instruction count" times "CPI" times "Clock cycle time"
+$
+or, since the clock rate is the inverse of clock cycle time:
+$
+  "CPU time" = "Instruction count" times "CPI" / "Clock rate"
+$
 
 #pagebreak()
 
@@ -149,6 +201,19 @@ For example, all instruction classes use the *arithmetic-logical unit* (ALU) aft
   caption: "A complete implementation of RISC-V data path",
 )
 
+== Building a data path
+looking at which *datapath elements* each instruction needs, and then work our way down through the levels of abstraction.
+
+@fig:first-datapath-component shows the first element we need: a memory unit to store the instructions of a program and *supply instructions* given an address.
+- *Program Counter (PC)* is a register that holds the address of the current instruction.
+- *Adder* is used to increment the PC by 4 to get the address of the next instruction and it is permanently made an adder and cannot perform the other ALU functions.
+- The *instruction memory* need only provide read access because the datapath does not write instructions.
+
+#figure(
+  image("figures/first-datapath-component.jpg", width: 80%),
+  caption: [First datapath component: Instruction Memory],
+) <fig:first-datapath-component>
+
 == RISC-V Pipelining
 Pipelining is a performance optimization technique based on the *overlap* of the execution of multiple instructions deriving from a sequential execution flow. Pipelining exploits *instruction parallelism* in a sequential instruction stream.
 
@@ -189,20 +254,6 @@ We want to perform the following assembly lines:
   image("figures/resource_used_pipeline.jpg", width: 80%),
   caption: [Resources used during the pipeline execution ],
 )
-
-== The Processor Performance Equation
-Essentially all computers are constructed using a clock running at a constant rate. These discrete time events are called _clock periods, clocks, cycles,or clock cycles_. Computer designers refer to the time of a clock period by its duration (e.g., 1 ns) or by its rate (e.g., 1 GHz). CPU time for a program can then be expressed two ways:
-$
-  "CPU time" = "CPU clock cycles for a program" times "Clock cycle time"
-$
-Or
-$
-  "CPU time" = "CPU clock cycles for a program" / "Clock rate"
-$
-In addition to the number of clock cycles needed to execute a program, we can also count the number of instructions executed---the _instruction path length_ or _instruction count_ (IC). If we know the number of clock cycles and the instruction count, we can calculate the average number of _clock cycles per instruction_(CPI). CPI is computed as:
-$
-  "CPI" = "CPU clock cycles for a program" / "Instruction count"
-$
 
 #bibliography("references.bib")
 
