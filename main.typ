@@ -1,6 +1,7 @@
-#import "@preview/codelst:2.0.1": sourcecode
-#import "@preview/lovelace:0.3.0": *
 #import "@local/simple-note:0.0.1": *
+#import "@preview/codly:1.2.0": *
+#import "@preview/codly-languages:0.1.1": *
+#show: codly-init.with()
 
 #show: simple-note.with(
   title: [ Advanced Computer Architecture ],
@@ -26,6 +27,8 @@
 #set math.equation(supplement: [Eq.])
 
 #let nonum(eq) = math.equation(block: true, numbering: none, eq)
+#let firebrick(body) = text(fill: rgb("#b22222"), body)
+
 
 = Fundamental Concepts
 == Classes of Parallelism and Parallel Architectures
@@ -255,5 +258,50 @@ We want to perform the following assembly lines:
   caption: [Resources used during the pipeline execution ],
 )
 
+== Performance Metrics
+IC = Instruction Count, CPI = Clocks Per Instruction, IPC = Instructions Per Clock Cycle = 1 / CPI, MIPS = $f_("clock") slash ("CPI" times 10^6)$.
+
+*Clock Cycles = IC + Stall Cycles + 4*. 4 is clocks to conclude the pipeline.
+
+#example("Speedup of Pipeline")[
+  Consider the unpipelined processor in the previous section. Assume that it has a *4 GHz* clock (or a 0.5 ns clock cycle) and that it uses *four cycles* for ALU oper-ations and branches and *five cycles* for memory operations.
+
+  Assume that the relative frequencies of these operations are 40%, 20%, and 40%, respectively.
+
+  Suppose that due to clock skew and setup, *pipelining the processor adds 0.1 ns* of overhead to the clock. Ignoring any latency impact, how much speedup in the instruction execution rate will we gain from a pipeline?
+
+
+  The average instruction execution time on the unpipelined processor is:
+  $
+    "Average instruction execution time" =& "Clock cycle" times "Average CPI" \
+    =& 0.5 "ns" times [(40%+20%) times 4 + 40% times 5] \
+    =& 0.5 "ns" times 4.4 \
+    =& 2.2 "ns"
+  $
+  In the pipelined implementation, the clock must run at the speed of the slowest stage plus overhead, which will be $0.5 + 0.1$ or $0.6 "ns"$; this is the average instruction execution time. Thus, the speedup from pipelining is:
+  $
+    "Speedup" =& "Unpipelined execution time" / "Pipelined execution time" \
+    =& (2.2 "ns") / (0.6 "ns") \
+    =& 3.67 "times"
+  $
+]
+
+== Pipeline Hazards
+There are situations, called *_hazards_*, that prevent the next instruction in the instruc-
+tion stream from executing during its designated clock cycle. Hazards reduce the performance from the ideal speedup gained by pipelining. There are *three classes of hazards*.
+
+=== Structural Hazards
+*Structural hazards* occur when we attempt to use the same resource from different instructions simutaneously.
+
+The RISC-V architecture avoids *structural hazards* by two key design decisions:
++ *Separate Instruction and Data Memories (_Harvard-Style Architecture_)*: The *fetch stage (IF)* of the pipeline accesses the *Instruction Memory* to read the next instruction. The *memory stage (MEM)* of the pipeline accesses the *Data Memory* to read/write operands. Since the *IM* and *DM* are separate, fetching an instruction and accessing data can happen in parallel without resource competition.
++ *Multiple-Ported Register File Design*: Read ports allow instructions in the decode stage (ID) to read operands. Write ports allow instructions in the write-back stage (WB) to update registers. #firebrick[Register file read/write operations can occur in the same clock cycle without conflict.]
+
+=== Data Hazards
+If the instructions executed in the pipeline are *dependent to each other*, data hazards can arise when instructions are too close.
+
+
+
+#pagebreak()
 #bibliography("references.bib")
 
