@@ -1,6 +1,4 @@
 #import "@local/simple-note:0.0.1": *
-#import "@preview/codly:1.2.0": *
-#import "@preview/codly-languages:0.1.1": *
 #show: codly-init.with()
 
 #show: simple-note.with(
@@ -158,16 +156,16 @@ All RISC architectures(*RISC V, MIPS, ARM*) are characterized by a few key prope
     - *Conditional branches*:the branch is taken only if the condition is true.
     Only if the condition is true (branch on equal):
     ```asm
-      beq rs1, rs2, L1 # go to L1 if (rs1 == rs2)
+    beq rs1, rs2, L1 # go to L1 if (rs1 == rs2)
     ```
     Only if the condition is false (branch on not equal):
     ```asm
-      bne rs1, rs2, L1 # go to L1 if (rs1 != rs2)
+    bne rs1, rs2, L1 # go to L1 if (rs1 != rs2)
     ```
     - *Unconditional branches*: the branch is always taken.
     ```asm
-        j L1              # go to L1
-        jr ra             # go to add. contained in ra
+    j L1              # go to L1
+    jr ra             # go to add. contained in ra
     ```
 ]
 
@@ -239,10 +237,10 @@ The sequential and pipelining cases consist of 5 instructions, each of which is 
 
 We want to perform the following assembly lines:
 ```asm
-  op $x , $y , $z       # assume $x <- $y + $z
-  lw $x , offset ($y)   # $x <- M[$y + offset ]
-  sw $x , offset ($y)   # M[$y + offset ] <- $x
-  beq $x , $y , offset
+op $x , $y , $z       # assume $x <- $y + $z
+lw $x , offset ($y)   # $x <- M[$y + offset ]
+sw $x , offset ($y)   # M[$y + offset ] <- $x
+beq $x , $y , offset
 ```
 
 #figure(
@@ -298,9 +296,83 @@ The RISC-V architecture avoids *structural hazards* by two key design decisions:
 + *Multiple-Ported Register File Design*: Read ports allow instructions in the decode stage (ID) to read operands. Write ports allow instructions in the write-back stage (WB) to update registers. #firebrick[Register file read/write operations can occur in the same clock cycle without conflict.]
 
 === Data Hazards
-If the instructions executed in the pipeline are *dependent to each other*, data hazards can arise when instructions are too close.
+If the instructions executed in the pipeline are *dependent to each other*, data hazards can arise when instructions are too close. There are three types of data hazards:
++ *Read After Write (RAW) hazard*: Instruction $n+1$ tries to read a source operand before the previous instruction $n$ has written its value in the Register File.
++ *Write After Read (WAR) hazard*: This hazard occurs when read of register x by instruction $n+1$ occurs after a write of register x by instruction $n$.
++ *Write After Write (WAW) hazard:* This hazard occurs when write of register x by instruction $n+1$ occurs after a write of register x by instruction $n$.
 
+Let's look at a sequence with many dependences, shown in color:
+```asm
+sub x2, x1, x3   # Register x2 written by sub
+and x12, x2, x5  # 1st operand(x2) depends on sub
+or  x13, x6, x2  # 2nd operand(x2) depends on sub
+add x14, x2, x2  # 1st(x2) & 2nd(x2) depend on sub
+sw  x15, 100(x2) # Base (x2) depends on sub
+```
+The four instructions are all dependent on the result in register `x2` of the first instruction. The @fig:data-hazards-example illustrates the execution of these instructions using a multiple-clock-cycle pipeline representation. The top of @fig:data-hazards-example shows the value ofregister `x2`, which changes during the middle of clock cycle 5, when the `sub` instruction writes its result.
 
+The first hazard in the sequence is on register `x2`, between the result of `sub x2, x1, x3` and the first read operand of and x12, x2, x5. This hazard can be detected when the and instruction is in the `EX` stage and the prior instruction is in the `MEM` stage, so this is hazard 1a:
+#nonum($
+  "EX/MEM.RegisterRd" = "ID/EX.RegisterRs1"
+$)
+
+#definition("Notation of Pipeline Register")[
+  A notation that names the fields of the pipeline registers allows for a more precise notation of dependences. For example, "*ID/EX.RegisterRs1*" refers to the number of one register whose value is found in the pipeline register ID/EX;that is, the one from the first read port of the register file. The first part of the name, to the left of the period, is the name of the pipeline register; the second part is the name of the field in that register. Using this notation, the two pairs of hazard conditions are
+  - 1a. EX/MEM.RegisterRd = ID/EX.RegisterRs1
+  - 1b. EX/MEM.RegisterRd = ID/EX.RegisterRs2
+  - 2a. MEM/WB.RegisterRd = ID/EX.RegisterRs1
+  - 2b. MEM/WB.RegisterRd = ID/EX.RegisterRs2
+]
+
+#figure(
+  image("figures/data-hazards-example.jpg", width: 80%),
+  caption: "Data Hazards Example",
+) <fig:data-hazards-example>
+
+#example("Dependence Detection")[
+  The pipeline can be illustrated as:
+  #figure(
+    image("figures/pipelines-example.jpg", width: 80%),
+    caption: "Pipeline Example",
+  )
+  The `sub-and` instruction pair:
+  - Dependence: The value from `x2` is from the `sub` instruction.
+  - Timing overlap: When `and` is in `ID` stage(cycle 3), `sub` is in `EX` stage. The `sub` x2 has not been written back to the register (has to wait until the `sub` `WB` stage, cycle 5).
+  - Hazards type: 1a. EX/MEM.RegisterRd = ID/EX.RegisterRs1
+
+  The `sub-or` instruction pair:
+  - Dependence: The value from `x2` is from the `sub` instruction.
+  - Timing overlap: When `or` is in `ID` stage(cycle 4), `sub` is in `MEM` stage. The `sub` x2 has not been written back to the register (has to wait until the `sub` `WB` stage, cycle 5).
+  - Hazards type: 2b. MEM/WB.RegisterRd = ID/EX.RegisterRs2
+
+  The `sub-add` instruction pair:
+  - Dependence: The two value from `x2` is from the `sub` instruction.
+  - Timing overlap: When `add` is in `ID` stage(cycle 5), `sub` is in `WB` stage. The `sub` x2 has been written back to the register.
+  - So there is no hazard between `sub` and `add`. Register file read/write operations can occur in the same clock cycle without conflict.
+
+  The `sub-sw` instruction pair:
+  - Dependence: The value from `x2` is from the `sub` instruction.
+  - Timing overlap: When `sw` is in `ID` stage(cycle 6), `sub` is in `WB` stage. The x2 is stably stored in a register file.
+  - So there is no hazard between `sub` and `sw`.
+]
+
+The problem posed in @fig:data-hazards-example can be solved with a simple hardware technique called _*forwarding*_.
+
+#figure(
+  image("figures/forwarding-pipeline.jpg", width: 80%),
+  caption: "Forwarding in a Pipeline",
+)
+
+If we can take the inputs to the ALU from _any_ pipeline register rather than just `ID/EX`, then we can forward the correct data. By adding multiplexors to the input of the ALU, and with the proper controls, we can run the pipeline at full speed in the presence of these data hazards.
+
+The dependences between the pipeline registers move forward in time, so it is possible to supply the inputs to the ALU needed by the `and` instruction by forwarding the results found in the pipeline registers.
+
+@fig:forwarding-hardware shows close-up of the ALU and pipeline register after adding forwarding. The multiplexors have been expanded to add the forwarding paths, and we show the forwarding unit. 
+
+#figure(
+  image("figures/forwarding_hardware.jpg", width: 80%),
+  caption: "Forwarding Hardware",
+) <fig:forwarding-hardware>
 
 #pagebreak()
 #bibliography("references.bib")
