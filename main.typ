@@ -397,14 +397,58 @@ Discarding instructions, means we must be able to *flush* instructions in the `I
   To discard instructions in a pipeline, usually due to an unexpected event.
 ]
 
-== Reducing the Delay of Branches
+=== Reducing the Delay of Branches
 One way to improve conditional branch performance is to *reduce the cost of the taken branch*. The next PC a brach is selected in the `MEM` stage, but if we move the conditional branch execution earlier in the pipeline, then fewer instructions need be flushed. We can move the branch adder from the `EX` stage to the `ID` stage.
+\
+*If the branch outcome will be taken*, it will be necessary to:
++ *Flush only one* instructions before writing its results
++ *Fetch next instruction* at the Branch Target Address
+It reduces the penalty of a branch to only one instruction if the branch is taken, namely, the one currently being fetched.
+
+To flush instructions in the `IF` stage, we add a control line, called *IF.Flush*, that zeros the instruction field of the `IF/ID` pipeline register. Clearing the register transforms the fetched instruction into a `nop`, an instruction that has *no action and changes no state*.
+
+One stall cycle for every branch will yield a performance loss of 10% to 30% depending on the branch frequency, so we will examine some techniques to deal with this loss.
+
+#example("Pipelined Branch")[
+  Consider the following sequence of instructions:
+  ```asm
+  36 sub x10, x4, x8
+  40 beq x1, x3, 16   // PC-relative branch to 40+16*2=72
+  44 and x12, x2, x5
+  48 or  x13, x2, x6
+  52 add x14, x4, x2
+  56 sub x15, x6, x7
+  ...
+  72 ld  x4, 50(x7)
+  ```
+]
 
 #pagebreak()
+= Branch Prediction
+There are two types of methods to deal with the performace loss due to branch hazards:
++ *Static Branch Predition Techniques*: The prediction (taken/untaken) for a branch is fixed at *compile time* for each branch during the entire execution of the program.
++ *Dynamic Branch Prediction Techniques*: The prediction (taken/untaken) for a branch can change *at runtime* during the program execution.
 
-$
-  x^2 + 3x + 2
-$
+== Static Branch Prediction
+*Static Branch Prediction* is a simple method that assumes the prediction is *fixed* at *compile time* by using some *heuristics* or compiler hints --- rather than considering the runtime execution behavior. It is typically an effective method when the branch behavior for the target application is *highly predictable* at compile time.
+
+=== Branch Always Not Taken
+It is the easiest predition, *we assume the branch will be always not taken*, thus the instruction flow can continue sequentially as if the branch condition was not satisfied. And it is suitable for `IF-THEN-ELSE` conditional statements, when the `THEN` clause is the most probable and the program will continue sequentially.
+
+#figure(
+  image("figures/branch-not-taken.jpg", width: 80%),
+  caption: "Branch Always Not Taken Prediction",
+) 
+
+First, we predict the branch not taken at the end of the `IF` stage.
+- If the branch outcome at the end of `ID` stage will be not taken $arrow.double.long$ the *prediction was correct* and there is *no branch penalty cycles*.
+- If the branch outcome at the end of `ID` stage will be taken $arrow.double.long$ the *prediction was incorrect*. In this case, we need to *flush* the instruction already fetched (it is turned into a `nop`) and need to *fetch* the instruction at the branch target address $arrow.double.long$ *one branch penalty cycle*.
+
+=== Branch Always Taken
+#figure(
+  image("figures/branch-always-taken.jpg", width: 80%),
+  caption: "Branch Always Taken Prediction",
+)
 
 #pagebreak()
 #bibliography("references.bib")
