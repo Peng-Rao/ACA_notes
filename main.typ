@@ -367,12 +367,44 @@ If we can take the inputs to the ALU from _any_ pipeline register rather than ju
 
 The dependences between the pipeline registers move forward in time, so it is possible to supply the inputs to the ALU needed by the `and` instruction by forwarding the results found in the pipeline registers.
 
-@fig:forwarding-hardware shows close-up of the ALU and pipeline register after adding forwarding. The multiplexors have been expanded to add the forwarding paths, and we show the forwarding unit. 
+@fig:forwarding-hardware shows close-up of the ALU and pipeline register after adding forwarding. The multiplexors have been expanded to add the forwarding paths, and we show the forwarding unit.
 
 #figure(
   image("figures/forwarding_hardware.jpg", width: 80%),
   caption: "Forwarding Hardware",
 ) <fig:forwarding-hardware>
+
+== Control Hazards
+@fig:branch-hazards-example shows a sequence of instructions and indicates when the branch would occur in this pipeline. The numbers of the left of the instruction are the addresses of the instructions.
+
+#figure(
+  image("figures/branch-hazards-example.jpg", width: 80%),
+  caption: "Branch Hazards Example",
+) <fig:branch-hazards-example>
+
+An instruction must be fetched at every clock cycle to sustain the pipeline, yet in our design the decision about whether to branch doesn't occur until the *MEM* pipeline stage.
+
+Delay in determining the proper instruction to fetch is called a _control hazard_ or _branch hazard_.
+
+=== Assume Branch Not Taken
+One improvement over branch stalling is to *predict* that the conditional branch will not be taken and thus continue execution down the sequential instruction stream.
+- If the conditional branch *is taken*, the instructions that are being *fetched and decoded must be discarded*. Execution continues at the branch target.
+- If conditional branches *are untaken* half the time, and if it costs little to discard the instructions, this optimization halves the cost of control hazards.
+
+Discarding instructions, means we must be able to *flush* instructions in the `IF`, `ID`, and `EX` stages of the pipeline.
+
+#definition("Flush")[
+  To discard instructions in a pipeline, usually due to an unexpected event.
+]
+
+== Reducing the Delay of Branches
+One way to improve conditional branch performance is to *reduce the cost of the taken branch*. The next PC a brach is selected in the `MEM` stage, but if we move the conditional branch execution earlier in the pipeline, then fewer instructions need be flushed. We can move the branch adder from the `EX` stage to the `ID` stage.
+
+#pagebreak()
+
+$
+  x^2 + 3x + 2
+$
 
 #pagebreak()
 #bibliography("references.bib")
