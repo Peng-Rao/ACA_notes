@@ -438,17 +438,37 @@ It is the easiest predition, *we assume the branch will be always not taken*, th
 #figure(
   image("figures/branch-not-taken.jpg", width: 80%),
   caption: "Branch Always Not Taken Prediction",
-) 
+)
 
 First, we predict the branch not taken at the end of the `IF` stage.
 - If the branch outcome at the end of `ID` stage will be not taken $arrow.double.long$ the *prediction was correct* and there is *no branch penalty cycles*.
 - If the branch outcome at the end of `ID` stage will be taken $arrow.double.long$ the *prediction was incorrect*. In this case, we need to *flush* the instruction already fetched (it is turned into a `nop`) and need to *fetch* the instruction at the branch target address $arrow.double.long$ *one branch penalty cycle*.
 
 === Branch Always Taken
+Predition taken at the end of the `IF` stage.
+- If the branch outcome at the end of `ID` stage will be taken $arrow.double.long$ *the predition was correct* $arrow.double.long$ *no branch penalty cycles*.
+- If the branch outcome at the end of `ID` stage will be not taken $arrow.double.long$ *misprediction*. In this case, we need to *flush* the instruction already fetched (it is turned into a `nop`) and need to *fetch* the next instruction $arrow.double.long$ *one branch penalty cycle*.
+
 #figure(
   image("figures/branch-always-taken.jpg", width: 80%),
   caption: "Branch Always Taken Prediction",
 )
+
+#example("Branch Probability")[
+  *Backward-going branches* are mostly *taken*. Example: ranches at the end of `DO-WHILE` loops going back at the beginning of the next iteration.
+  \
+  *Forward-going branches* are mostly *not taken*. Example: branches of `IF-THEN-ELSE` conditional statements when the conditions associated to the `ELSE` label as less probable.
+]
+
+=== Profile-Driven Prediction
+We assume to *profile* the behavior of the target application program by several early execution runs by using different data sets. The prediction is based on *profiling information* collected during earlier runs about the branch behavior. For example:
+```
+T  T  T  T  T  T  T  T  NT NT NT // Taken is the most probable branch outcome
+```
+The profile-driven prediction method requires a *compiler hint bit* encoded in the branch instruction format by the compiler:
+- Set to *1* if *taken* is the most probable branch outcome.
+- Set to *0* if *not taken* is the most probable branch outcome.
+
 
 #pagebreak()
 #bibliography("references.bib")
