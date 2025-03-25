@@ -469,6 +469,66 @@ The profile-driven prediction method requires a *compiler hint bit* encoded in t
 - Set to *1* if *taken* is the most probable branch outcome.
 - Set to *0* if *not taken* is the most probable branch outcome.
 
+=== Delayed Branch Technique
+Delay branch technology adjusts *instruction order* to reduce pipeline idle cycles and improve efficiency. After the branch instruction, insert one or more delay slots (*_Delay Slot_*). Regardless of whether the branch is taken, the instructions in the delay slots will be executed. The compiler needs to fill the delay slots with useful instructions as much as possible, rather than no-operation (NOP), to avoid pipeline stalls.
+
+#example("Delayed Branch Technique")[
+  Let's consider the MIPS compiler schedules a *branch independent instruction* after the branch. A previous *add* instruction with no effects on the branch condition is scheduled in the _*Branch Delay Slot*_ and it is always executed, whether or not the branch will be taken.
+  #figure(
+    image("figures/delayed-branch-technique.jpg", width: 80%),
+    caption: "Example: Delayed Branch Technique",
+  )
+  *Be careful*: The instruction in the slot must be fine to be executed also when the branch goes in the unexpected direction.
+]
+The job of the compiler is to find a valid and useful instruction to be scheduled in the branch delay slot. There are four ways to schedule an instruction in the branch delay slot:
++ From before
++ Frome target
++ From fall-through
++ From after
+
+#theorem("Delayed Branch Technique: From Before")[
+  The branch delay slot is scheduled with an *independent* instruction from *before the branch*.Then execution will continue based on the Branch Outcome in the right direction and the add instruction in the delay slot will never be flushed.
+  #figure(image("figures/from-before-branch.jpg", width: 80%))
+]
+
+#theorem("Delayed Branch Technique: From Target")[
+  The branch delay slot is scheduled with one instruction from the target of the branch (branch taken). *Drawback*: Usually, the target instruction sub needs to be copied, whenever it can be reached by another path.
+
+  #figure(image("figures/from-target.jpg", width: 80%))
+
+  This strategy is preferred when the branch is taken with high probablity, such as `DO-WHILE` loop branches (*backward branches*).
+
+  If the branch is *untaken*(misprediction), the *sub* instruction in the delay slot needs to be *flushed* or it must be OK to be executed also when the branch goes in the unexpected direction.
+]
+
+#theorem("Delayed Branch Technique: From Fall-Through")[
+  The branch delay slot is scheduled with one instruction *from the fall-through path (branch not taken)*.
+
+  #figure(image("figures/from-before-branch.jpg", width: 80%))
+  This strategy is preferred when the branch is *not taken* with high probability, such as forwarding branches: `IF-THEN-ELSE` statement where the `ELSE` path is less probable.
+
+  If the branch is *taken (misprediction)*, the `or` instruction in the delay slot needs to be *flushed* or it must be OK to be executed also when the branch goes in the unexpected direction.
+]
+
+== Dynamic Branch Prediction
+The basic idea is to use the past branch behavior to predict at runtime the future branch behavior.
+- We use the hardware to dynamically predict the outcome of a branch.
+- The prediction will depend on the runtime behavior of the branch.
+- The prediction will change at runtime if the branch changes its behavior during execution.
+
+=== Branch History Table
+One implementation of that approach is a *branch prediction buffer* or *branch history table*. A branch prediction buffer is a small memory indexed by the lower portion of the address of the branch instruction. The memory contains a bit that says whether the branch was recently taken or not.
+
+The behavior is controlled by a *Finite State Machine* with only 1-bit of history (2 states) to remember the last direction taken by the the branch to predict the next branch outcome.
+
+*Finite State Machine* with only 1-bit of history to remember the last direction taken by the branch:
+- If the prediction is correct $arrow.double.long$ remains in the current status (and branch prediction outcome)
+- If the prediction is not correct $arrow.double.long$ changes the status (and branch prediction outcome)
+
+#figure(image("figures/finite-state-machine.jpg", width: 80%))
+
+== Register Renaming
+
 
 #pagebreak()
 #bibliography("references.bib")
