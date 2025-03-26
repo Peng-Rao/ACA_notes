@@ -527,8 +527,64 @@ The behavior is controlled by a *Finite State Machine* with only 1-bit of histor
 
 #figure(image("figures/finite-state-machine.jpg", width: 80%))
 
-== Register Renaming
+Table containing 1 bit for each entry that says whether the branch was recently *taken* or *not taken*. Table indexed by the lower portion k-bit of the address of the branch instruction. (For locality reasons, we would expect that the most significant bits of the branch address are not changed.)
 
+The table has *no tags* (every access is a hit) and the prediction bit may have been put there by another branch with the same low-order address bits: but it doesn' matter. The prediction is just a hint!
+
+The misprediction occurs when the prediction is incorrect for that branch.
+
+#figure(
+  image("figures/1-bit-branch-history-table.jpg", width: 80%),
+  caption: "1-bit Branch History Table",
+)
+
+The shortcoming of 1-bit branch history table: *In a loop branch*, a branch is almost always T and then NT once at the exit of the loop. The 1-bit BHT causes 2 mispredictions:
+- At the last loop iteration, since the prediction bit is T, while we need to exit from the loop.
+- *When we re-enter the loop, at the first iteration we need to take the branch to stay in the loop*, while the prediction bit was flipped to NT on previous execution of the last iteration of the loop.
+
+#example("shortcoming of 1-bit BHT")[
+  Assuming the `for loop for (int i = 0; i < 10; i++) `is within the function `foo()`, this loop will run every time `foo()` is called.
+
+  In the first execution:
+  #table(
+    columns: (auto, auto, auto, auto),
+    align: horizon,
+    table.header(
+      [*Interation*],
+      [*Actual Branch*],
+      [*BTH prediction*],
+      [*Result*],
+    ),
+
+    [1-9], [Taken(T)], [Taken(T)], [✅],
+    [10], [Not Taken (NT)], [Taken(T)], [❌],
+  )
+  If `foo()` is called again, this loop starts again.
+  #table(
+    columns: (auto, auto, auto, auto),
+    align: horizon,
+    table.header(
+      [*Interation*],
+      [*Actual Branch*],
+      [*BTH prediction*],
+      [*Result*],
+    ),
+
+    [1], [Taken(T)], [Not Taken (NT)], [❌],
+    [2-9], [Taken (T)], [Taken(T)], [✅],
+    [10], [Not Taken (NT)], [Taken(T)], [❌],
+  )
+  During the first iteration of the new cycle, BHT is still Not Taken (NT) (because it remembers the exit condition of the last cycle). But in fact, we hope to continue the loop (T), so the prediction of Not Taken (NT) occurred an error, leading to the second false prediction.
+]
+
+The solution to this problem is to use a *2-bit branch history table*---The prediction must mispredict twice before it is changed!
+
+#figure(
+  image("figures/2-bit-BHT-scheme.jpg", width: 80%),
+  caption: "2-bit Branch History Table",
+)
+
+== Register Renaming
 
 #pagebreak()
 #bibliography("references.bib")
