@@ -584,7 +584,81 @@ The solution to this problem is to use a *2-bit branch history table*---The pred
   caption: "2-bit Branch History Table",
 )
 
+#pagebreak()
+
+= Introduction to Instruction Level Parallelism
+This potential overlap among instructions is called _instruction-level parallelism (ILP)_, because the instructions can be evaluated in parallel.
+
+The value of the CPI (cycles per instruction) for a pipelined processor is the sum of the base CPI and all contributions from stalls:
+
+#nonum($
+  "Pipeline CPI" = "Ideal pipeline CPI" + "Structural stalls" + "Data hazard stalls" + "Control stalls"
+$)
+
+#attention[
+  Remind that pipeling improves *instruction throughput*, but not the latency of the single instruction.
+]
+
+== The problem of Dependences
+Determining dependences among instructions is critical to define the amount of parallelism existing in a program. If two instructions are *dependent* to each other, they cannot be executed in parallel, they must be executed in a sequential order or only partially overlapped.
+
+There are *three* different types of dependences in a code:
+- *True Data Dependences*: an instruction $j$ is dependent on a data produced by a previous instruction $i$
+- *Name Dependences*: two instructions use the same register or memory location;
+- *Control Dependences*: they impose the ordering of instructions
+
+== Name Dependences
+A *name dependence* occurs when two instructions use the same register or memory location (called name), but there is no flow of data between the instructions associated with that name.
+
+#attention[
+  Name dependences are *not true data dependences*, since there is no value (no data flow) being transmitted between the two instructions => this is just a *register reuse*!
+]
+
+There are two types of name dependences:
+- Anti-dependences
+- Output Dependences
+
+Let's consider Ii that precedes instruction Ij in program order:
++ *Anti-dependences*: When *Ij* writes a register or memory location that instruction *Ii* read, it can generate a *Write After Read (WAR) hazard*.
++ *Output dependences*: When *Ij* writes a register or memory location that instruction *Ii* also writes, it can generate a *Write After Write (WAW) hazard*.
+
 == Register Renaming
+If the register used could be changed, then the instructions do not conflict anymore.
+
+#example("Register Renaming")[
+  ```asm
+  Ii: r3 <-  (r1)  op  (r2)
+  Ij: r1 <- (r4) op (r5) => r4 <- (r4) op (r5)
+
+  Ii: r3 <-  (r1)  op  (r2)
+  Ij: r3 <- (r6) op (r7) => r4 <- (r6) op (r7)
+  ```
+]
+Register renaming can be more easily done, if there are enough registers available in the ISA. Register Renaming can be done either statically by the compiler or dynamically by the hardware.
+
+== Summary
+Data dependency does not directly determine the *number of pipeline stalls*, whether true hazards occur, and how to eliminate them; it depends on how the pipeline handles these dependencies. In other words, the architectural characteristics of the pipeline determine:
+- wether there is a hazard
+- If there is a hazard, how to eliminate it(hardware or compiler)
+- If it cannot be optimized, the pipeline needs to stop several times
+
+When the pipeline executes instructions, the dependency relationships between instructions may lead to the following three types of data hazards:
+- *RAW hazards* correspond to *true data dependences*
+- *WAR hazards* correspond to *anti-dependences*
+- *WAW hazards* correspond to *output dependences*
+
+Dependences are a property of the program, while hazards are a property of the pipeline architecture.
+
+#pagebreak()
+
+= Advanced Dynamic Scheduling Techniques
+== Tomasulo Algorithm
+_Tomasulo Algorithm_, invented by Robert Tomasulo, tracks when operands for instructions are available to minimize *RAW hazards* and introduces *register renaming* in hardware to minimize *WAW and WAR hazards*.
+
+Although there are many variations of this scheme in recent processors, they all rely on two key principles:
+- dynamically determining when an instruction is ready to execute.
+- renaming registers to avoid unnecessary hazards.
+
 
 #pagebreak()
 #bibliography("references.bib")
