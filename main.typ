@@ -540,6 +540,16 @@ The basic idea is to use the past branch behavior to predict at runtime the futu
 - The prediction will depend on the runtime behavior of the branch.
 - The prediction will change at runtime if the branch changes its behavior during execution.
 
+Dynamic branch prediction is based on two interacting hardware blocks:
++ *Branch Outcome Predictor* (BOP) or *Branch Prediction Buffer*: To predict the direction of a branch (Taken or Not Taken).
++ *Branch Target Predictor* or *Branch Target Buffer* (BTB): To predict the branch target address in case of taken branch
+They are placed in the *Instruction Fetch stage* to predict the next instruction to read in the Instruction Cache
+
+#figure(
+  image("figures/dynamic-branch-prediction.jpg", width: 60%),
+  caption: "Dynamic Branch Prediction",
+)
+
 === Branch History Table
 One implementation of that approach is a *branch prediction buffer* or *branch history table*. A branch prediction buffer is a small memory indexed by the lower portion of the address of the branch instruction. The memory contains a bit that says whether the branch was recently taken or not.
 
@@ -551,9 +561,9 @@ The behavior is controlled by a *Finite State Machine* with only 1-bit of histor
 
 #figure(image("figures/finite-state-machine.jpg", width: 80%))
 
-Table containing 1 bit for each entry that says whether the branch was recently *taken* or *not taken*. Table indexed by the lower portion k-bit of the address of the branch instruction. (For locality reasons, we would expect that the most significant bits of the branch address are not changed.)
+Table containing 1 bit for each entry that says whether the branch was recently *taken* or *not taken*. *Table indexed by* the lower portion k-bit of the address of the branch instruction. (For locality reasons, we would expect that the most significant bits of the branch address are not changed.)
 
-The table has *no tags* (every access is a hit) and the prediction bit may have been put there by another branch with the same low-order address bits: but it doesn' matter. The prediction is just a hint!
+The table has *no tags* (every access is a hit) and the prediction bit may have been put there by another branch with the same low-order address bits: but it doesn't matter. The prediction is just a hint!
 
 The misprediction occurs when the prediction is incorrect for that branch.
 
@@ -574,7 +584,7 @@ The shortcoming of 1-bit branch history table: *In a loop branch*, a branch is a
     columns: (auto, auto, auto, auto),
     align: horizon,
     table.header(
-      [*Interation*],
+      [*Iteration*],
       [*Actual Branch*],
       [*BTH prediction*],
       [*Result*],
@@ -588,7 +598,7 @@ The shortcoming of 1-bit branch history table: *In a loop branch*, a branch is a
     columns: (auto, auto, auto, auto),
     align: horizon,
     table.header(
-      [*Interation*],
+      [*Iteration*],
       [*Actual Branch*],
       [*BTH prediction*],
       [*Result*],
@@ -607,6 +617,36 @@ The solution to this problem is to use a *2-bit branch history table*---The pred
   image("figures/2-bit-BHT-scheme.jpg", width: 80%),
   caption: "2-bit Branch History Table",
 )
+
+=== Branch Target Buffer
+*Branch Target Buffer* (Branch Target Predictor) is a cache storing the Predicted Target Address (PTA) for the taken-branch instructions. The PTA is expressed as PC-relative. The BTB is used in combination with the Branch History Table in the *IF stage*.
+
+Usually, it is combined with a *Branch Outcome Predictor* such as a 1-bit (or 2-bit) Branch History Table.
+
+#figure(
+  image("figures/branch-target-buffer.jpg", width: 80%),
+  caption: "Branch Target Buffer",
+)
+
+=== Correlating Branch Predictors
+The 2-bit BHT uses only the recent behavior of a single branch to predict the future behavior of that branch.
+
+*Basic Idea*: the behavior of recent branches are correlated, that is the recent behavior of *other branches* rather than just the current branch (we are trying to predict) can influence the prediction of the current branch.
+
+We try to exploit the correlation existing among different branches: branches are partially based on the same conditions(they can generate information that can influence the behavior of other branches).
+
+Branch predictors that use the behavior of other branches to make a prediction are called *Correlating Predictors* or *2-level Predictors*.
+
+#figure(
+  image("figures/2-level-predictors.jpg", width: 60%),
+  caption: "2-level Predictors",
+)
+
+Record if the most recently executed branches have been *taken* or *not taken*. The branch is predicted based on the previous executed branch by selecting the appropriate 1-bit BHT:
+- One prediction is used if the last branch executed was *taken*
+- Another prediction is used if the last branch executed was *not taken*
+
+In general, the last branch executed is not the same instruction as the branch being predicted (although this can occur in simple loops with no other branches in the loops).
 
 #pagebreak()
 
