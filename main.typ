@@ -98,7 +98,7 @@ $
 == Instruction Performance
 One way to think about execution time is that it equals the number of instructions executed multiplied by the average time per instruction. Therefore, the number of clock cycles required for a program can be written as *CPI* is computed as:
 $
-  "CPU clock cycles" = "Instructions fora program" times "Average cycles per instruction"
+  "CPU clock cycles" = "Instructions for a program" times "Average cycles per instruction"
 $
 The term clock cycles per instruction, which is the average number of clock cycles each instruction takes to execute, is often abbreviated as *CPI*.
 $
@@ -175,7 +175,7 @@ Every instruction in this RISC subset can be implemented in, at most, *5 clock c
 + _Instruction Fetch(IF)_: Send the program counter (PC) to memory and fetch the current instruction from memory. Update the PC to the next *sequential instruction* by adding 4 (because each instruction is 4 bytes) to the PC.
 + _Instruction decode/register fetch cycle (ID)_: Decode the instruction and read the registers corresponding to register source specifiers from the register file. Do the equality test on the registers as they are read, for a possible branch. Sign-extend the offset field of the instruction in case it is needed. Compute the possible branch target address by adding the sign-extended offset to the incremented PC.
 + _Execution/effective address cycle (EX)_: The ALU operates on the operands prepared in the prior cycle, performing one of three functions, depending on the instruction type.
-+ _Memory access (MEM)_: If the instruction is a load, the memory does a read using the effective address computed in the previous cycle. If it is a store, then the memory writes the data from the second register read from the register file using the effective address.
++ _Memory access (MEM)_: If the instruction is a *load*, the memory does a read using the effective address computed in the previous cycle. If it is a *store*, then the memory writes the data from the second register read from the register file using the effective address.
 + _Write-back cycle (WB)_: Write the result into the *register file*, whether it comes from the memory system (for a load) or from the ALU (for an ALU instruction).
 
 == Implementation of RISC-V processor
@@ -363,16 +363,36 @@ The problem posed in @fig:data-hazards-example can be solved with a simple hardw
   caption: "Forwarding in a Pipeline",
 )
 
-If we can take the inputs to the ALU from _any_ pipeline register rather than just `ID/EX`, then we can forward the correct data. By adding multiplexors to the input of the ALU, and with the proper controls, we can run the pipeline at full speed in the presence of these data hazards.
+==== Forwarding
 
-The dependences between the pipeline registers move forward in time, so it is possible to supply the inputs to the ALU needed by the `and` instruction by forwarding the results found in the pipeline registers.
+If we can take the inputs to the ALU from _any_ pipeline register rather than just `ID/EX`, then we can forward the correct data. By adding multiplexers to the input of the ALU, and with the proper controls, we can run the pipeline at full speed in the presence of these data hazards.
 
-@fig:forwarding-hardware shows close-up of the ALU and pipeline register after adding forwarding. The multiplexors have been expanded to add the forwarding paths, and we show the forwarding unit.
+The dependence between the pipeline registers move forward in time, so it is possible to supply the inputs to the ALU needed by the `and` instruction by forwarding the results found in the pipeline registers.
+
+@fig:forwarding-hardware shows close-up of the ALU and pipeline register after adding forwarding. The multiplexers have been expanded to add the forwarding paths, and we show the forwarding unit.
 
 #figure(
   image("figures/forwarding_hardware.jpg", width: 80%),
   caption: "Forwarding Hardware",
 ) <fig:forwarding-hardware>
+
+There are three forwarding paths:
+
+===== EX/EX Path
+The first path is between the ALU output of the `EX` stage and the ALU input of the `EX` stage. This path is used to forward the result of the `sub` instruction to the `and` instruction.
+
+===== MEM/EX Path
+Required for load-use hazards, where the loaded value is only available after MEM.
+
+===== MEM/MEM Path
+typically for `load` and `store` instructions.
+
+#figure(
+  image("figures/forwarding-path.jpg", width: 80%),
+  caption: "Forwarding Unit",
+)
+
+
 
 == Control Hazards
 @fig:branch-hazards-example shows a sequence of instructions and indicates when the branch would occur in this pipeline. The numbers of the left of the instruction are the addresses of the instructions.
@@ -409,31 +429,35 @@ To flush instructions in the `IF` stage, we add a control line, called *IF.Flush
 
 One stall cycle for every branch will yield a performance loss of 10% to 30% depending on the branch frequency, so we will examine some techniques to deal with this loss.
 
-#example("Pipelined Branch")[
-  Consider the following sequence of instructions:
-  ```asm
-  36 sub x10, x4, x8
-  40 beq x1, x3, 16   // PC-relative branch to 40+16*2=72
-  44 and x12, x2, x5
-  48 or  x13, x2, x6
-  52 add x14, x4, x2
-  56 sub x15, x6, x7
-  ...
-  72 ld  x4, 50(x7)
-  ```
-]
+// #example("Pipelined Branch")[
+//   Consider the following sequence of instructions:
+//   ```asm
+//   36 sub x10, x4, x8
+//   40 beq x1, x3, 16   // PC-relative branch to 40+16*2=72
+//   44 and x12, x2, x5
+//   48 or  x13, x2, x6
+//   52 add x14, x4, x2
+//   56 sub x15, x6, x7
+//   ...
+//   72 ld  x4, 50(x7)
+//   ```
+// ]
 
 #pagebreak()
 = Branch Prediction
-There are two types of methods to deal with the performace loss due to branch hazards:
-+ *Static Branch Predition Techniques*: The prediction (taken/untaken) for a branch is fixed at *compile time* for each branch during the entire execution of the program.
+There are two types of methods to deal with the performance loss due to branch hazards:
++ *Static Branch Prediction Techniques*: The prediction (taken/untaken) for a branch is fixed at *compile time* for each branch during the entire execution of the program.
 + *Dynamic Branch Prediction Techniques*: The prediction (taken/untaken) for a branch can change *at runtime* during the program execution.
+
+#definition("Branch Target Address")[
+  The *Branch Target Address* is the address where to branch. If the branch condition is satisfied, the branch is taken and the branch target address is stored in the *Program Counter (PC)*.
+]
 
 == Static Branch Prediction
 *Static Branch Prediction* is a simple method that assumes the prediction is *fixed* at *compile time* by using some *heuristics* or compiler hints --- rather than considering the runtime execution behavior. It is typically an effective method when the branch behavior for the target application is *highly predictable* at compile time.
 
 === Branch Always Not Taken
-It is the easiest predition, *we assume the branch will be always not taken*, thus the instruction flow can continue sequentially as if the branch condition was not satisfied. And it is suitable for `IF-THEN-ELSE` conditional statements, when the `THEN` clause is the most probable and the program will continue sequentially.
+It is the easiest prediction, *we assume the branch will be always not taken*, thus the instruction flow can continue sequentially as if the branch condition was not satisfied. And it is suitable for `IF-THEN-ELSE` conditional statements, when the `THEN` clause is the most probable and the program will continue sequentially.
 
 #figure(
   image("figures/branch-not-taken.jpg", width: 80%),
@@ -445,8 +469,8 @@ First, we predict the branch not taken at the end of the `IF` stage.
 - If the branch outcome at the end of `ID` stage will be taken $arrow.double.long$ the *prediction was incorrect*. In this case, we need to *flush* the instruction already fetched (it is turned into a `nop`) and need to *fetch* the instruction at the branch target address $arrow.double.long$ *one branch penalty cycle*.
 
 === Branch Always Taken
-Predition taken at the end of the `IF` stage.
-- If the branch outcome at the end of `ID` stage will be taken $arrow.double.long$ *the predition was correct* $arrow.double.long$ *no branch penalty cycles*.
+Prediction taken at the end of the `IF` stage.
+- If the branch outcome at the end of `ID` stage will be taken $arrow.double.long$ *the prediction was correct* $arrow.double.long$ *no branch penalty cycles*.
 - If the branch outcome at the end of `ID` stage will be not taken $arrow.double.long$ *misprediction*. In this case, we need to *flush* the instruction already fetched (it is turned into a `nop`) and need to *fetch* the next instruction $arrow.double.long$ *one branch penalty cycle*.
 
 #figure(
@@ -596,31 +620,31 @@ The value of the CPI (cycles per instruction) for a pipelined processor is the s
 $)
 
 #attention[
-  Remind that pipeling improves *instruction throughput*, but not the latency of the single instruction.
+  Remind that pipelining improves *instruction throughput*, but not the latency of the single instruction.
 ]
 
-== The problem of Dependences
-Determining dependences among instructions is critical to define the amount of parallelism existing in a program. If two instructions are *dependent* to each other, they cannot be executed in parallel, they must be executed in a sequential order or only partially overlapped.
+== The problem of Dependencies
+Determining dependencies among instructions is critical to define the amount of parallelism existing in a program. If two instructions are *dependent* to each other, they cannot be executed in parallel, they must be executed in a sequential order or only partially overlapped.
 
-There are *three* different types of dependences in a code:
-- *True Data Dependences*: an instruction $j$ is dependent on a data produced by a previous instruction $i$
-- *Name Dependences*: two instructions use the same register or memory location;
-- *Control Dependences*: they impose the ordering of instructions
+There are *three* different types of dependencies in a code:
+- *True Data Dependencies*: an instruction $j$ is dependent on a data produced by a previous instruction $i$
+- *Name Dependencies*: two instructions use the same register or memory location;
+- *Control Dependencies*: they impose the ordering of instructions
 
-== Name Dependences
+== Name Dependencies
 A *name dependence* occurs when two instructions use the same register or memory location (called name), but there is no flow of data between the instructions associated with that name.
 
 #attention[
-  Name dependences are *not true data dependences*, since there is no value (no data flow) being transmitted between the two instructions => this is just a *register reuse*!
+  Name dependencies are *not true data dependencies*, since there is no value (no data flow) being transmitted between the two instructions => this is just a *register reuse*!
 ]
 
-There are two types of name dependences:
-- Anti-dependences
-- Output Dependences
+There are two types of name dependencies:
+- dependencies
+- Output dependencies
 
 Let's consider Ii that precedes instruction Ij in program order:
-+ *Anti-dependences*: When *Ij* writes a register or memory location that instruction *Ii* read, it can generate a *Write After Read (WAR) hazard*.
-+ *Output dependences*: When *Ij* writes a register or memory location that instruction *Ii* also writes, it can generate a *Write After Write (WAW) hazard*.
++ *Anti-dependencies*: When *Ij* writes a register or memory location that instruction *Ii* read, it can generate a *Write After Read (WAR) hazard*.
++ *Output dependencies*: When *Ij* writes a register or memory location that instruction *Ii* also writes, it can generate a *Write After Write (WAW) hazard*.
 
 == Register Renaming
 If the register used could be changed, then the instructions do not conflict anymore.
@@ -636,18 +660,67 @@ If the register used could be changed, then the instructions do not conflict any
 ]
 Register renaming can be more easily done, if there are enough registers available in the ISA. Register Renaming can be done either statically by the compiler or dynamically by the hardware.
 
-== Summary
+== Summary of Data Dependencies
 Data dependency does not directly determine the *number of pipeline stalls*, whether true hazards occur, and how to eliminate them; it depends on how the pipeline handles these dependencies. In other words, the architectural characteristics of the pipeline determine:
 - wether there is a hazard
 - If there is a hazard, how to eliminate it(hardware or compiler)
 - If it cannot be optimized, the pipeline needs to stop several times
 
 When the pipeline executes instructions, the dependency relationships between instructions may lead to the following three types of data hazards:
-- *RAW hazards* correspond to *true data dependences*
-- *WAR hazards* correspond to *anti-dependences*
-- *WAW hazards* correspond to *output dependences*
+- *RAW hazards* correspond to *true data dependencies*
+- *WAR hazards* correspond to *anti-dependencies*
+- *WAW hazards* correspond to *output dependencies*
 
-Dependences are a property of the program, while hazards are a property of the pipeline architecture.
+Dependencies are a property of the program, while hazards are a property of the pipeline architecture.
+
+A control dependence determines the ordering of instructions and it is preserved by two properties:
+- Instructions execution in program order to ensure that an instruction that occurs before a branch is executed before the branch.
+- Detection of control hazards to ensure that an instruction (that is control-dependent on a branch) is not executed until the branch direction is known.
+
+Although preserving control dependence is a simple way to preserve program order, control dependence is not the critical property that must be preserved(as seen when we've studied scheduling techniques to fill in the branch delay slot).
+
+Two properties are critical to preserve program correctness (and normally preserved by maintaining both data and control dependencies during scheduling):
+- *Data flow*: Actual flow of data values among instructions that produces the correct results and consumes them.
+- *Exception behavior*: Preserving exception behavior means that any changes in the ordering of instruction execution must not change how exceptions are raised in the program.
+
+== Multi-cycle Pipeline
+We consider *single-issue* processors (one instruction issued per clock cycle).
+- Instructions are then *issued in-order*.
+- *Execution stage* might require multiple cycles latency, depending on the operation type (i.e., multiply operations are typically longer than add/sub operations).
+- *Memory stages* might require multiple cycles access time due to instruction and data cache misses.
+
+=== Multi-cycle In-Order Pipeline
+#figure(
+  image("figures/multi-cycle-in-order-pipeline.jpg", width: 80%),
+  caption: "Multi-cycle In-Order Pipeline",
+)
+
+#figure(image("figures/multi-cycle-in-order-pipeline1.jpg", width: 80%))
+
+- *In-order issue* & *In-order commit* of instructions.
+- This avoids the generation of *WAR* & *WAW* hazards and preserves the *precise exception model*.
+
+=== Multi-cycle Out-of-Order Pipeline
+#figure(
+  image("figures/multi-cycle-out-of-order.jpg", width: 80%),
+  caption: "Multi-cycle Out-of-Order Pipeline",
+)
+- ID stage split in 2 stages: Instr. Decode (*ID*) & Register Read (*Issue*);
+- Multiple functional units with variable latency;
+- Long latency *multi-cycle floating-point instructions*;
+- Memory systems with variable access time: *Multi-cycle memory accesses* due to data cache misses (unpredictable statically);
+- *Out-of-order commit*: Need to check for WAR & WAW hazards and imprecise exception
+
+#figure(image("figures/multi-cycle-out-of-order1.jpg", width: 80%))
+- *In-order issue* of instructions
+- *Out-of-order execution & out-of-order commit* of instructions
+- Need to check the generation of *WAR & WAW hazards* and imprecise exceptions.
+
+=== Dynamic Scheduling
+*Problem*: Hazards due to true data dependencies that
+cannot be solved by forwarding cause stalls of the pipeline. No new instructions are fetched nor issued even if they are not data dependent
+\
+*Solution*: Allow data independent instructions behind a stall to proceed: Hardware manages dynamically the instruction execution to reduce stalls: an instruction execution begins as soon as their operands are available.
 
 #pagebreak()
 
