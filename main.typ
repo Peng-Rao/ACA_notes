@@ -765,6 +765,48 @@ cannot be solved by forwarding cause stalls of the pipeline. No new instructions
 #pagebreak()
 
 = Advanced Dynamic Scheduling Techniques
+== Scoreboard Dynamic Scheduling Technique
+=== Scoreboard basic assumptions
+- We consider a *single-issue* processor.
+- Instruction Fetch stage fetches and issues instructions in program order (*in-order issue*).
+- Instruction execution begins *as soon as operands are ready* whenever not dependent on previous instructions (no *RAW* hazards).
+- There are *multiple* pipelined Functional Units with *variable latencies*.
+- Execution stage might require *multiple cycles*, depending on the operation type and latency.
+- Memory stage might require *multiple cycles* access time due to data cache misses.
+- *Out-of-order execution & out-of-order commit*(this introduces the possibility of *WAR & WAW* hazards).
+
+=== Scoreboard Pipeline stages
+==== Issue
+Decode instruction and check for structural hazards & *WAW hazards*. Instructions issued in program order (for hazard checking).
+- If a functional unit for the instruction is available (*no structural hazard*) and no other active instruction has the same destination register (*no WAW hazard*) => the Scoreboard issues the instruction to the FU and updates its data structure.
+- If either a *structural hazard* or a *WAW hazard* exists => the instruction issue stalls, and no further instructions will issue until these hazards are solved.
+
+==== Read Operands
+Wait until no *RAW hazards*, and then read operands. Check for structural hazards in reading ports of RF.
+
+A source operand is available if:
+- No earlier issued active instruction will write it or
+- A functional unit is writing its value in a register
+
+When the source operands are available, the Scoreboard tells the FU to proceed to read the operands from the RF and begin execution.
+
+RAW hazards are solved dynamically in this step:
+- out-of-order reading of operands
+- instructions are sent into execution out-of-order.
+
+==== Execution
+The FU begins execution upon receiving operands. When the result is ready, it notifies the Scoreboard that execution has been completed.
+
+- FUs are characterized by variable latency to complete execution.
+- Load/Store latency depends on data cache HIT/MISS times.
+
+==== Write result
+Check for *WAR hazards* on destination. Check for *structural hazards* in writing RF and finish execution.
+
+Once the Scoreboard is aware that the FU has completed execution, *the Scoreboard checks for WAR hazards*.
+- If none, it writes results.
+- If there is a *WAR*, the Scoreboard stalls the completing instruction.
+
 == Tomasulo Algorithm
 _Tomasulo Algorithm_, invented by Robert Tomasulo, tracks when operands for instructions are available to minimize *RAW hazards* and introduces *register renaming* in hardware to minimize *WAW and WAR hazards*.
 
