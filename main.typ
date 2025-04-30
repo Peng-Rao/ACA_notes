@@ -855,13 +855,65 @@ state of the functional unit:
   caption: "Register Result Status",
 )
 
-== Tomasulo Algorithm
+== Tomasulo Dynamic Scheduling Technique
 _Tomasulo Algorithm_, invented by Robert Tomasulo, tracks when operands for instructions are available to minimize *RAW hazards* and introduces *register renaming* in hardware to minimize *WAW and WAR hazards*.
 
 Although there are many variations of this scheme in recent processors, they all rely on two key principles:
 - dynamically determining when an instruction is ready to execute.
 - renaming registers to avoid unnecessary hazards.
 
+=== Reservation Station
+- *Busy*: Indicates reservation station is busy.
+- *Op*: Operation to perform in the unit.
+- *$V_j$, $V_k$*: Value of source operands.
+- *$Q_j$, $Q_k$*: Pointers to reservation stations producing source registers, if $Q_j, Q_k=0$, the operand ready.
+
+=== Register File and Store Buffers
+Each entry in the RF and in the Store buffers have a Value ($V_i$) and a Pointer ($Q_i$) field.
+- The *Value* ($V_i$) field holds the register/buffer content;
+- The *Pointer* ($Q_i$) field corresponds to the number of the RS producing the result to be stored in this register
+- If the pointer is zero means that the value is available in the register/buffer content (no active instruction is computing the result);
+
+=== Load/Store Buffers
+Load/Store buffers have *Busy and Address field*. To hold info for memory address calculation for load/stores, the address field initially contains the instruction offset (immediate field); after address calculation, it stores the effective address.
+
+=== Stages of Tomasulo Algorithm
+==== Issue
+Instructions are fetched from the head of a *FIFO queue*, ensuring they are issued in program order. This maintains in-order issue even if execution is out-of-order.
+
+Each instruction requires an available RS. If none are free, the instruction stalls, preventing structural hazards due to limited hardware resources.
+
+*Operand Readiness & Register Renaming (Q Pointers):*
+- If operands are in the Register File (RF), they are read directly.
+- If operands are not ready, the RS tracks the Functional Unit (FU) that will produce them via $Q$ pointers.
+
+*WAR Hazard Resolution:* If instruction I writes to register Rx, any earlier-issued instruction K that reads Rx has either:
+- Already read the value from RF, or
+- Tracked the correct producer FU via Q pointers.
+
+*WAW Hazard Resolution:* In-order issue ensures that if two instructions write to the same register, the later-issued instruction updates the RF's Q pointer to its own FU. Even if the earlier write completes later, the RF only commits the result from the last-issued (program-order) write, preventing *WAW hazards*.
+
+==== Execution
++ *Operand Readiness Check (RAW Hazard Resolution)*:
+  - An instruction begins execution only when both operands are ready (values available in Reservation Station (RS) or forwarded via Common Data Bus (CDB)).
+  - *RAW hazards are resolved dynamically*: Execution is delayed until source operands are produced by prior instructions, ensuring no RAW hazards at this stage.
++ *Functional Unit (FU) Availability Check (Structural Hazard)*:
+  - Even if operands are ready, execution proceeds only if the required FU is free.
+  - If the FU is busy, the instruction stalls, avoiding structural hazards due to FU contention.
++ *Monitoring the Common Data Bus (CDB)*:
+  - If operands are not ready, the RS tracks the CDB for incoming results from other FUs.
+  - When a result matching the required operand's producer tag (Q pointer) appears on the CDB, the operand is captured and marked as ready.
++ *Handling Multiple Ready Instructions*:
+  - If multiple instructions targeting the same FU become ready in the same cycle: For `Loads/Stores`, must execute in program order to preserve memory consistency; For Arithmetic/Logical Operations, Can execute out-of-order if the FU supports it.
+  - The scheduler typically prioritizes older (earlier-issued) instructions to maintain fairness or program order where required.
++ *RAW Hazard Shortening via Forwarding*:
+  - Operands are sourced *directly from the RS/CDB*, bypassing the Register File (RF). This mimics forwarding, eliminating the wait for RF write-back and reducing RAW resolution latency.
++ *Execution Completion & CDB Broadcast*:
+  - Once execution finishes, the result is *broadcast to all RS entries and the RF via the CDB*.
+  - RS entries waiting on this result update their operands, enabling dependent instructions to proceed.
+
+==== Write result
+When result is available, write it on Common Data Bus and from there into Register File and into all RSs (including store buffers) waiting for this result; Stores also write data to memory unit during this stage (when memory address and result data are available); Mark reservation station available.
 
 #pagebreak()
 #bibliography("references.bib")
