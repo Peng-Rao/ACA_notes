@@ -776,6 +776,12 @@ cannot be solved by forwarding cause stalls of the pipeline. No new instructions
 - *Out-of-order execution & out-of-order commit*(this introduces the possibility of *WAR & WAW* hazards).
 
 === Scoreboard Pipeline stages
+
+#figure(
+  image("figures/scoreboard-architecture.jpg", width: 80%),
+  caption: "Scoreboard Architecture",
+)
+
 ==== Issue
 Decode instruction and check for structural hazards & *WAW hazards*. Instructions issued in program order (for hazard checking).
 - If a functional unit for the instruction is available (*no structural hazard*) and no other active instruction has the same destination register (*no WAW hazard*) => the Scoreboard issues the instruction to the FU and updates its data structure.
@@ -806,6 +812,48 @@ Check for *WAR hazards* on destination. Check for *structural hazards* in writin
 Once the Scoreboard is aware that the FU has completed execution, *the Scoreboard checks for WAR hazards*.
 - If none, it writes results.
 - If there is a *WAR*, the Scoreboard stalls the completing instruction.
+
+#example("RAW/WAR/WAW")[
+  ```asm
+  DIVD F0, F2, F4
+  ADDD F6, F0, F8   // RAW F0
+  SUBD F8, F8, F14  // WAR F8
+  MULD F6, F10, F8  // WAW F6
+  ```
+
+  - To avoid the *WAR* hazard on F8, the Scoreboard would: Stall *SUBD* in the WB stage, waiting for *ADDD* reads F0 and F8;
+  - To avoid the *WAW* hazard on F6, the Scoreboard would: Stall *MULD* in the ISSUE stage until *ADDD* writes F6.
+
+  Note: Any `WAR/WAW` hazard could have been solved through register renaming at compile time.
+]
+
+=== Instruction Status
+
+#figure(
+  image("figures/instruction-status.jpg", width: 80%),
+  caption: "Instruction Status",
+)
+
+=== Functional unit status
+state of the functional unit:
+- *Busy*: indicates whether the unit is busy or not.
+- *Op*: operation to perform in the unit.
+- *$F_i$*: destination register
+- *$F_j, F_k$*: source registers
+- *$Q_j, Q_k$*: functional units producing $F_j, F_k$
+- *$R_j, R_k$*: flags indicating when $F_j, F_k$ are ready and not yet read. Set to NO after operands are read.
+
+#figure(
+  image("figures/functional-unit-status.jpg", width: 80%),
+  caption: "Functional Unit Status",
+)
+
+=== Register result status
+
+#figure(
+  image("figures/register-result-status.jpg", width: 80%),
+  caption: "Register Result Status",
+)
 
 == Tomasulo Algorithm
 _Tomasulo Algorithm_, invented by Robert Tomasulo, tracks when operands for instructions are available to minimize *RAW hazards* and introduces *register renaming* in hardware to minimize *WAW and WAR hazards*.
