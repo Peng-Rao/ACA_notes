@@ -915,6 +915,26 @@ Each instruction requires an available RS. If none are free, the instruction sta
 ==== Write result
 When result is available, write it on Common Data Bus and from there into Register File and into all RSs (including store buffers) waiting for this result; Stores also write data to memory unit during this stage (when memory address and result data are available); Mark reservation station available.
 
+=== Reorder Buffer
+We introduce the concept of HW-based speculation, which extends the ideas of dynamic scheduling beyond branches.
+
+HW-based speculation combines *3 key concepts*:
++ *Dynamic branch prediction*;
++ *Speculation* to enable the execution of instructions before the branches are solved by undoing the effects of mispredictions;
++ *Dynamic scheduling* beyond branches.
+
+To support *HW-based speculation*, we need to enable the execution of instructions *before* the control dependencies are solved. In case of mispredictions, we need to undo the effects of an incorrectly speculated sequence of instructions.
+
+Therefore, we need to separate the process of execution completion from the commit of the instruction result in the RF or in memory.
+
+*Solution*: We need to introduce an HW buffer, called *Reorder Buffer (ROB)*, called *ReOrderBuffer*, to hold the result of an instruction that has finished execution, but not yet committed in RF/memory.
+
+ReOrder Buffer has been introduced to support *out-of-order execution but in-order commit*. Buffer to hold the results of instructions that have finished execution *but not yet committed*. Buffer to pass results among instructions that have started  *speculatively* after a branch.
+
+The *ROB* is also used to pass results among dependent instructions to start execution as soon as possible $arrow$ The renaming function of *Reservation Stations* is replaced by ROB entries.
+
+Use *ReOrder Buffer numbers* instead of reservation station numbers as pointers to pass data between dependent instructions. Reservation Stations now are used only to buffer instructions and operands to FUs (to reduce structural hazards).
+
 #pagebreak()
 #bibliography("references.bib")
 
