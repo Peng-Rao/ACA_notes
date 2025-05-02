@@ -985,7 +985,84 @@ A *dependence graph* captures true, anti and output dependencies between instruc
   caption: "Dependence Graph",
 )
 
+#pagebreak()
 
+= Advanced Memory Hierarchy
+== Introduction to caches
+#definition("Temporal Locality")[
+  When there is a reference to one memory element, the trend is to refer again to the same memory element soon (i.e., instruction and data reused in loop bodies)
+]
+
+#definition("Spatial Locality")[
+  When there is a reference to one memory element, the trend is to refer soon at other memory elements whose addresses are close by (i.e., sequence of instructions or accesses to data organized as arrays or matrices)
+]
+
+Caches exploit both types of predictability:
+- Exploit *temporal locality* by keeping the contents of recently accessed memory locations.
+- Exploit *spatial locality* by fetching blocks of data around recently accessed memory locations.
+
+=== Basic Concepts
+- In general, the memory hierarchy is composed of several levels.
+- Let us consider 2 levels: cache and main memory
+- The cache (_upper level_) is smaller, faster and more expensive than the main memory (_lower level_).
+- The minimum chunk of data that can be copied in the cache is the *block* or *cache line*.
+- To exploit the spatial locality, the block size must be a multiple of the word size in memory, example: 128-bit block size = 4 words of 32-bit
+- The number of blocks in cache is given by: *Number of cache blocks = Cache Size / Block Size*
+
+=== Cache Hit and Miss
+If the requested data is found in one of the cache blocks (upper level), there is a hit in the cache access.
+
+If the requested data is not found in in one of the cache blocks (upper level), there is a miss in the cache access, to find the block, we need to access the lower level of the memory hierarchy
+
+In the case of a data miss, we need to:
+- To stall the CPU
+- To require to block from the main memory
+- To copy (write) the block in cache
+- To repeat the cache access (hit)
+
+=== Cache Structure
+Each entry (cache line) in the cache includes:
+- *Valid bit* to indicate if this position contains valid data or not. At the bootstrap, all the entries in the cache are marked as `INVALID`
+- *Cache Tag(s)* contains the value that unique identifies the memory address corresponding to the stored data.
+- *Cache Data* contains a copy of data (block or cache line)
+
+#figure(
+  image("figures/cache-structure.jpg", width: 60%),
+  caption: "Cache Structure",
+)
+
+==== Block Placement
+Given the address of the block in the main memory, where the block can be placed in the cache? We need to find the correspondence between the memory address and the cache address of the block, the correspondence depends on the cache structure:
+- Direct Mapped Cache
+- Fully Associative Cache
+- n-way Set-Associative Cache
+
+For *Direct Mapped Cache*, each memory location corresponds to one and only one cache location. The cache address of the block is given by:
+$
+  "(Block Address)cache = (Block Address)mem mod (Num. of Cache Blocks)"
+$
+
+#figure(
+  image("figures/direct-mapped-cache.jpg", width: 60%),
+  caption: "Direct Mapped Cache",
+)
+
+For *fully associative cache*, the memory block can be placed in any position of the cache, all the cache blocks must be checked during the search of the block. The index does not exist in the memory address, there are the tag bits only
+
+#figure(
+  image("figures/fully-associative-cache.jpg", width: 60%),
+  caption: "Fully Associative Cache",
+)
+
+=== Write policy
+There are two policies to write data in the cache:
+- *Write-Through*: the information is written to both the block in the cache and to the block in the lower-level memory
+- *Write-Back*: the information is written only to the block in cache. The modified cache block is written to the lower-level memory only when it is replaced due to a miss.
+
+#figure(
+  image("figures/cache-summary.jpg", width: 80%),
+  caption: "Cache Summary",
+)
 
 #pagebreak()
 #bibliography("references.bib")
