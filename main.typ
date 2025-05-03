@@ -1054,6 +1054,24 @@ For *fully associative cache*, the memory block can be placed in any position of
   caption: "Fully Associative Cache",
 )
 
+For *n-way set associative cache*, Cache composed of sets, each set composed of n blocks: Number of sets = Cache Size / (Block Size $times$ n)
+
+#example("cache structures")[
+  Let us consider a memory hierarchy (main memory + cache) given by:
+  - Memory size 1 Giga words of 16 bit (word addressed);
+  - Cache size 1 Mega words of 16 bit (word addressed);
+  - Cache block size 256 words of 16 bit.
+
+  1. Calculate the number of cache blocks:
+  $
+    "cache blocks" = "cache size" / "block size" = (1 M) / 256 = 4096
+  $
+  2. Calculate the structure of the addresses for the following cache structures:
+  - *Direct Mapped Cache*: The block size is 256 words, so the offset is 8 bits ($256 = 2^8$). The number of cache blocks is 4096, so the index is 12 bits ($4096 = 2^12$). The tag is 30 - 12 - 8 = 10 bits.
+  - *Fully Associative Cache*: The block size is 256 words, so the offset is 8 bits ($256 = 2^8$). The number of cache blocks is 4096, so the index is 0 bits. The tag is 30 - 8 = 22 bits.
+  - *2-way Set-Associative Cache*: The number of sets is $4096 / 2=2048$, so the index is 11 bits ($2048 = 2^11$). The block size is 256 words, so the offset is 8 bits ($256 = 2^8$). The tag is 30 - 11 - 8 = 11 bits.
+]
+
 === Write policy
 There are two policies to write data in the cache:
 - *Write-Through*: the information is written to both the block in the cache and to the block in the lower-level memory
@@ -1063,6 +1081,118 @@ There are two policies to write data in the cache:
   image("figures/cache-summary.jpg", width: 80%),
   caption: "Cache Summary",
 )
+
+#pagebreak()
+
+= Performance Evaluation
+== Clock cycle
+- $T_"CLK"$ = Period or clock cycle time [seconds]
+- $f_"CLK"$ s= Clock frequency = Clock cycles per second
+
+The relationship between the two is:
+$
+  f_"CLK" = 1 / T_"CLK"
+$
+
+Examples:
+- $f_"CLK"$ = 500 MHz corresponds to $T_"CLK" = 1 / (500 * 10^6) = 2 "ns"$
+- $f_"CLK"$ = 1 GHz corresponds to $T_"CLK" = 1 / (1 * 10^9) = 1 "ns"$
+
+== CPU time
+$
+  "CPU time" = "Clock cycles" * T_"CLK" = "Clock cycles" / f_"CLK"
+$
+To optimize performance means to reduce the execution time (or CPU time):
+- Reduce the number of clock cycles per program
+- Reduce the clock period $T_"CLK"$
+- To increase the clock frequency $f_"CLK"$
+
+The CPU time can also be represented as:
+$
+  "CPU time" = "Instruction count" times "CPI" times T_"CLK"
+$
+where Clock Per Instruction is given by:
+$
+  "CPI" = "Clock cycles" / "Instruction count"
+$
+
+#example("CPU time")[
+  #figure(image("figures/CPU-time-example.jpg", width: 60%))
+  Evaluate the CPI and the CPU time to execute a program composed of 100 instructions mixed as in the table by using 500 MHz clock frequency:
+  $
+    "CPI" = 0.43 * 1 + 0.21 * 4 + 0.12 * 4 + 0.12 * 2 + 0.12 * 2 = 2.23
+  $
+  $
+    "CPU time" = "Instruction count" * "CPI" * T_"CLK" = 100 * 2.23 * 2 "ns" = 446 "ns"
+  $
+]
+
+*MIPS (Million Instructions Per Second)* is a measure used to gauge the speed of a computer processor in executing instructions, indicating how many million machine instructions it can execute per second:
+$
+  "MIPS" = "Instruction count" / ("CPU time" times 10^6) = f_"CLK" / ("CPI" times 10^6)
+$
+
+== Performance Issues in Pipelining
+Pipelining increases the CPU instruction *throughput* (number of instructions completed per unit of time), but it does not reduce the execution time (latency) of a single instruction.
+
+- IC = Instruction Count
+- CPI = Clocks Per Instruction
+- IPC = Instructions Per Cycle = 1 / CPI
+- Clock Cycles = IC + Stalls + 4
+- CPI = Clock cycles / IC
+- MIPS = $"IC" / ("CPU time" times 10^6)$ = $f_"CLK" / ("CPI" times 10^6)$
+
+== Performance evaluation of the memory hierarchy
+In a stack of memories, the one on the lowest level is the slowest one (likely it is also the biggest, e.g., hard disk), while the one on the highest level (the topmost) is the fastest one (and also the smallest, e.g., a L1 cache, or a CPU register)
+- *Hit*: data found in a block of the upper level
+- *Hit Rate*: Number of memory accesses finding data in the upper level memory with respect to the total number of memory accesses:
+$
+  "Hit Rate" = "Number of hits" / "Total number of accesses"
+$
+- *Hit time*: time to access the data in the upper level of the hierarchy, including the time needed to decide if the attempt of access will result in a hit or miss
+- *Miss*: the data must be taken from the lower level
+- *Miss Rate*: number of memory accesses not finding data in the upper level with respect to the total number of memory accesses:
+$
+  "Miss Rate" = "Number of misses" / "Total number of accesses"
+$
+- By definition: Hit Rate + Miss Rate = 1
+- *Miss Time = Hit Time + Miss Penalty*(Miss Penalty is the time needed to access the lower level and to replace the block in the upper level) Hit time << Miss Penalty
+
+$
+  "AMAT" = "Hit Rate" times "Hit Time" + "Miss Rate" times "Miss Time"
+$
+$
+  "AMAT" = "Hit Rate" times "Hit Time" + "Miss Rate" times ("Hit Time" + "Miss Penalty")
+$
+$
+  "AMAT" = ("Hit Rate" + "Miss Rate") times "Hit Time" + "Miss Rate" times "Miss Penalty"
+$
+$
+  "AMAT" = "Hit Time" + "Miss Rate" times "Miss Penalty"
+$
+
+To improve cache performance:
+- Reduce the hit time
+- Reduce the miss rate
+- Reduce the miss penalty
+
+For separate I\$ & D\$ (Harvard architecture):
+$
+  "AMAT"_("harvard") =& \%"Instr". ("Hit Time" + "Miss Rate" I\$ \* "Miss Penalty") \
+  +& \%"Data" ("Hit Time" + "Miss Rate" D\$ \* "Miss Penalty")
+$
+Usually: Miss Rate I\$ << Miss Rate D\$
+
+=== Local and global miss rates
+#definition("Local miss rate")[
+  misses in this cache divided by the total number of memory accesses to this cache: the Miss $"rate"_"L1"$ for L1 and the Miss $"rate"_"L2"$ for L2
+]
+
+#definition("Global miss rate")[
+  misses in this cache divided by the total number of memory accesses generated by the CPU:
+  - For L1, the global miss rate is still just $"Miss Rate"_"L1"$
+  - For L2, it is $"Miss Rate"_"L1" times "Miss Rate"_"L2"$
+]
 
 #pagebreak()
 #bibliography("references.bib")
