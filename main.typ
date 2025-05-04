@@ -935,6 +935,26 @@ The *ROB* is also used to pass results among dependent instructions to start exe
 
 Use *ReOrder Buffer numbers* instead of reservation station numbers as pointers to pass data between dependent instructions. Reservation Stations now are used only to buffer instructions and operands to FUs (to reduce structural hazards).
 
+=== Speculative Tomasulo
+==== Issue
+Get instruction from instr. queue, if there are one RS entry free and one ROB entry free, then instr. Issued:
+
+If its operands available in RF or in ROB, they are sent to RS; Number of ROB entry allocated for result is sent to RSs (to tag the result when it will be placed on the CDB). *If RS full or/and ROB full: instruction stalls.*
+
+==== Execution started
+Start and execute on operands (EX). When both operands are ready in the RS (RAW solved), start to execute. If one or more operands are not yet ready, check for RAW solved by monitoring CDB for result. For a *store*, only base register needs to be available (at this point, only effective address is computed)
+
+==== Execution completed & Write result in ROB
+Write result on Common Data Bus to all awaiting FUs & to ROB value field; mark RS as available. For a store: the value to be stored is written in the ROB value field; otherwise monitor CDB until value is broadcast.
+
+==== Commit
+Update RF or memory with ROB result. When instr. at the head of ROB & result ready, update RF with result (or store to memory) and remove instruction from ROB entry. Mispredicted branch flushes ROB entries (sometimes called "graduation")
+
+There are three different possible sequences:
++ *Normal commit*: instruction reaches the head of the ROB, result is present in the buffer. Result is stored in the Register File, instruction is removed from ROB;
++ *Store commit*: as above, but result is stored in memory rather than in the RF;
++ Instruction is a mispredicted branch, speculation was wrong, ROB is flushed (“graduation”) and execution restarts at correct successor of the branch. 
+
 #pagebreak()
 
 = Very Long Instruction Word (VLIW)
