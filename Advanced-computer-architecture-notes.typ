@@ -1259,6 +1259,79 @@ In *Single-Bus Multiprocessors*,the connection medium (the bus)is between the pr
   caption: "Single Bus Multiprocessor",
 )
 
+#figure(
+  image("figures/single-bus-topology.jpg", width: 80%),
+  caption: "The topology of a single bus multiprocessor",
+)
+
+For single-bus topology, we calculate the metrics of performance:
+- *Total Network Bandwidth*: $1 times b = b$
+- *Bisection Bandwidth*: $1 times b = b$
+
+=== Ring
+Nodes are connected in a closed loop. It is capable of many simultaneous transfers. Some nodes are not directly connected, the communication between some nodes needs to pass through intermediate nodes to reach the final destination (multiple-hops).
+
+For single-bus topology, we calculate the metrics of performance:
+- *Total Network Bandwidth*: $P times b$
+- *Bisection Bandwidth*: $2 times b$
+
+#figure(
+  image("figures/ring-topology.jpg", width: 80%),
+  caption: "The topology of a ring multiprocessor",
+)
+
+== Memory Address Space
+There are two types of memory address space model:
+- Single logically shared address space: A memory reference can be made by any processor to any memory location through loads/stores, it is also known as *shared memory architecture*. The address space is shared among processors: The same physical address on 2 processors refers to the same location in memory.
+- *Multiple and private address spaces*: The processors communicate among them through send/receive primitives, it is also known as *message passing architecture*. The address space is logically disjoint and cannot be addressed by different processors: the same physical address on 2 processors refers to 2 different locations in 2 different memories.
+
+=== Shared Addresses
+The processors communicate among them through shared variables in memory. In shared memory architectures, communication among threads occurs through a shared address space.
+
+*Implicit management* of the communication through `load/store` operations to access any memory locations.
+
+Shared memory does not mean that there is a single centralized memory: the shared memory can be centralized or distributed over the nodes. Shared memory model imposes the cache coherence problem among processors.
+
+=== Multiple and Private Addresses
+The processors communicate among them through sending/receiving messages: *message passing protocol*.
+
+*Explicit management* of the communication through send/receive primitives to access private memory locations. The memory of one processor cannot be accessed by another processor without the assistance of software protocols. No cache coherence problem among processors.
+
+=== Physical Memory Organization
+#figure(
+  image("figures/physical-memory-organization.jpg", width: 80%),
+  caption: "Physical Memory Organization",
+)
+==== Centralized Memory
+*UMA (Uniform Memory Access)*: The access time to a memory location is *uniform* for all the processors: no matter which processor requests it and no matter which word is asked.
+==== Distributed Memory
+The physical memory is divided into memory modules distributed on each single processor.
+
+*NUMA (Non Uniform Memory Access)*: The access time to a memory location is *non uniform* for all the processors: it depends on the location of the data word in memory and the processor location.
+
+Multiprocessor systems can have single address space and distributed physical memory. The concepts of addressing space (single/multiple) and the physical memory organization *orthogonal* to each other.
+
+== Cache Coherence
+Shared-Memory Architectures cache both *private data* (used by a single processor) and *shared data* (used by multiple processors to provide communication).
+
+When shared data are cached, *the shared values may be replicated in multiple caches*. In addition to the reduction in access latency and required memory bandwidth, this replication provides a reduction of shared data contention read by multiple processors simultaneously. The use of multiple copies of same data introduces a new problem: cache coherence.
+
+Because the view of memory held by two different processors is through their individual caches, the processors could end up seeing different values for the same memory location, as the following figure shows.
+
+#figure(
+  image("figures/cache-coherence-problem.jpg", width: 100%),
+  caption: "Cache Coherence",
+)
+
+Maintain coherence has two components: *read* and *write*. Actually, multiple copies are not a problem when reading, but a processor must have exclusive access to write a word. Processors must have the most recent copy when reading an object, so all processors must get new values after a write.
+
+The protocols to maintain coherence for multiple processors are called cache _*coherence protocols*_. Key to implementing a cache coherence protocol is tracking the state of any sharing of a data block. There are two classes of protocols in use, each of which uses different techniques to track the sharing status.
+
+=== Snooping Protocols
+All cache controllers monitor (*snoop*) on the bus to determine whether or not they have a copy of the block requested on the bus and respond accordingly. Every cache that has a copy of the shared block, also has a copy of the sharing state of the block, and no centralized state is kept. Suitable for Centralized Shared-Memory Architectures, and in particular for small scale multiprocessors with single snoopy bus.
+
+
 #pagebreak()
+
 #bibliography("references.bib")
 
