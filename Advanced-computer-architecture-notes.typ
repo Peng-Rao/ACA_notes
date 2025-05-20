@@ -1330,6 +1330,62 @@ The protocols to maintain coherence for multiple processors are called cache _*c
 === Snooping Protocols
 All cache controllers monitor (*snoop*) on the bus to determine whether or not they have a copy of the block requested on the bus and respond accordingly. Every cache that has a copy of the shared block, also has a copy of the sharing state of the block, and no centralized state is kept. Suitable for Centralized Shared-Memory Architectures, and in particular for small scale multiprocessors with single snoopy bus.
 
+There are two types of snooping protocols depending on what happens on a write operation:
+- *Write-Invalidate Protocol*
+- *Write-Update (or Write-Broadcast) Protocol*
+
+#figure(
+  image("figures/snoop.jpg", width: 100%),
+  caption: "Snooping Protocol",
+)
+
+==== Write-Invalidate Protocol
+The writing processor issues an invalidation signal over the bus to cause all copies in other caches to be invalidated before changing its local copy. The writing processor is then free to update the local data until another processor asks for it.
+
+All caches on the bus check to see if they have a copy of the data and, if so, they must *invalidate* the block containing the data. This scheme allows *multiple* readers but only a *single* writer.
+
+The scheme uses the bus only on the first write to invalidate the other copies, and subsequent writes do not result in bus activity. This protocol provides similar benefits to write-back protocols in terms of reducing demands on bus bandwidth.
+
+==== Write-Update Protocol
+The writing processor broadcasts the new data over the bus; all caches check if they have a copy of the data and, if so, all copies are *updated* with the new value.
+
+This scheme requires the *continuous broadcast* of writes to shared data (while write-invalidate deletes all other copies so that there is only one local copy for subsequent writes). This protocol is like write-through because all writes go over the bus to update copies of the shared data.
+
+=== MSI Protocol
+The *MSI protocol* is a write-invalidate protocol that uses three states to track the status of a cache line:
+- *Modified (or Dirty):* cache has only copy, its writeable, and dirty (block cannot be shared anymore)
+- *Shared (or Clean)* (read only): the block is clean (not modified) and can be read
+- *Invalid:* block contains no valid data
+
+Each block of memory is in one of three states:
+- *Shared* in all caches and up-to-date in memory (Clean)
+- *Modified* in exactly one cache (Dirty)
+- *Uncached* when not in any caches
+
+Let us consider the following case. A processor we call $P_1$, want to read a block $X$. The cache line for data block $X$ in the local cache of CPU-A is currently in the `INVALID (I)` state.
++ $P_1$ encounters a Read Miss:
+  - $P_1$ send a request to the bus for block $X$;
+  - The cache controller of $P_1$ will check the local cache, the cache line for data block X is in an `INVALID` state, or there is no such cache line at all (both cases are considered a miss).
++ $P_1$ sends a request to the bus for block $X$
+  - The cache controller of Read Request on the bus. This request contains the address of the data block X it wants to read.
++ Other Cache Snooping Bus (Snooping):
+  - All other caches on the bus (such as $P_2$'s cache, $P_3$'s cache, etc.) will snoop this read request. They will check whether they also have a copy of data block $X$ and the status of that copy.
++ respond according to the status of other caches:
+  - *Case A*: All other caches do not have a copy of data block $X$, or all copies are in the `INVALID` state.
+    - *Processing*: At this time, the main memory is the only source of data block X, and the data in the main memory is the most up-to-date (as it has not been modified by the cache).
+    - *Result*: CPU-A loads data block X from the main memory. After the data is loaded, the status of data block X in CPU-A's cache becomes SHARED (S).
+  - *Case B*: At least one other cache (such as CPU-B) has a copy of data block X, and this copy is in the SHARED (S) state.
+    - *Processing*: This means that data block $X$ is also the most up-to-date in the main memory and in the $P_2$ cache (a feature of the S state).
+    - *Result*: $P_1$ loads data block $X$ from main memory. The status of data block X in CPU-A's cache becomes `SHARED (S)`. The status of data block X in $P_2$'s cache remains unchanged as `SHARED (S)`.
+  - *Case C*: There is exactly one other cache (e.g., $P_2$) that has a copy of the data block $X$, and this copy is in the `MODIFIED (M)` state.
+    - *Processing*: This is the most complex but also the most important situation. `MODIFIED` status means that the data block $X$ in the $P_2$ cache is the latest version, but it has not been written back to the main memory (it is "dirty" data). The data in the main memory is outdated.
+    - *Specific steps*:
+      - The cache controller of $P_2$ detects a read request from $P_1$ and finds that it has a copy in `MODIFIED` state
+      - The cache controller of $P_2$ will intervene this read request, preventing it from directly accessing the main memory.
+      - $P_2$ will write back the modified data block $X$ to the main memory (this process is called *Write-Back)*
+      - After the data is written back to the main memory, the state of data block $X$ in the $P_2$ cache will be downgraded from `MODIFIED (M)` to `SHARED (S)`. Because it is no longer the sole modifier, and its data is now consistent with the main memory.
+      - Once the data update in the main memory is completed, $P_1$'s cache will load data block $X$ from the main memory.
+      - $P_1$ cache block $X$'s status changes to `SHARED (S)`
 
 #pagebreak()
 
