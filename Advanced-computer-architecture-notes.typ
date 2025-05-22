@@ -1362,30 +1362,64 @@ Each block of memory is in one of three states:
 - *Modified* in exactly one cache (Dirty)
 - *Uncached* when not in any caches
 
-Let us consider the following case. A processor we call $P_1$, want to read a block $X$. The cache line for data block $X$ in the local cache of CPU-A is currently in the `INVALID (I)` state.
-+ $P_1$ encounters a Read Miss:
-  - $P_1$ send a request to the bus for block $X$;
-  - The cache controller of $P_1$ will check the local cache, the cache line for data block X is in an `INVALID` state, or there is no such cache line at all (both cases are considered a miss).
-+ $P_1$ sends a request to the bus for block $X$
-  - The cache controller of Read Request on the bus. This request contains the address of the data block X it wants to read.
-+ Other Cache Snooping Bus (Snooping):
-  - All other caches on the bus (such as $P_2$'s cache, $P_3$'s cache, etc.) will snoop this read request. They will check whether they also have a copy of data block $X$ and the status of that copy.
-+ respond according to the status of other caches:
-  - *Case A*: All other caches do not have a copy of data block $X$, or all copies are in the `INVALID` state.
-    - *Processing*: At this time, the main memory is the only source of data block X, and the data in the main memory is the most up-to-date (as it has not been modified by the cache).
-    - *Result*: CPU-A loads data block X from the main memory. After the data is loaded, the status of data block X in CPU-A's cache becomes SHARED (S).
-  - *Case B*: At least one other cache (such as CPU-B) has a copy of data block X, and this copy is in the SHARED (S) state.
-    - *Processing*: This means that data block $X$ is also the most up-to-date in the main memory and in the $P_2$ cache (a feature of the S state).
-    - *Result*: $P_1$ loads data block $X$ from main memory. The status of data block X in CPU-A's cache becomes `SHARED (S)`. The status of data block X in $P_2$'s cache remains unchanged as `SHARED (S)`.
-  - *Case C*: There is exactly one other cache (e.g., $P_2$) that has a copy of the data block $X$, and this copy is in the `MODIFIED (M)` state.
-    - *Processing*: This is the most complex but also the most important situation. `MODIFIED` status means that the data block $X$ in the $P_2$ cache is the latest version, but it has not been written back to the main memory (it is "dirty" data). The data in the main memory is outdated.
-    - *Specific steps*:
-      - The cache controller of $P_2$ detects a read request from $P_1$ and finds that it has a copy in `MODIFIED` state
-      - The cache controller of $P_2$ will intervene this read request, preventing it from directly accessing the main memory.
-      - $P_2$ will write back the modified data block $X$ to the main memory (this process is called *Write-Back)*
-      - After the data is written back to the main memory, the state of data block $X$ in the $P_2$ cache will be downgraded from `MODIFIED (M)` to `SHARED (S)`. Because it is no longer the sole modifier, and its data is now consistent with the main memory.
-      - Once the data update in the main memory is completed, $P_1$'s cache will load data block $X$ from the main memory.
-      - $P_1$ cache block $X$'s status changes to `SHARED (S)`
+Let us consider the following case.
+\
+==== Read Miss
+When CPU-A needs to read data block X, but its local cache has X in an `INVALID` state (a Read Miss occurs), CPU-A's cache controller issues a Read Request onto the bus. All other caches then snoop this request to check their own copies of X and their states.
+
+Here's how the system responds based on the other caches' states:
++ *No other valid copies or all `INVALID`*: If no other caches hold a valid copy of X, or all existing copies are `INVALID`, then main memory is the authoritative source. CPU-A loads data block X directly from main memory, and its cache's state for X becomes `SHARED (S)`. This means CPU-A gets the data and joins a potential shared state.
++ *Other copies are `SHARED(S)`*: If other caches (e.g., CPU-B) hold X in a `SHARED (S)` state, it indicates that X in main memory is still up-to-date. CPU-A again loads data block X directly from main memory. Both CPU-A's and CPU-B's (and any other) copies of X remain in the `SHARED (S)` state. Multiple caches simply share the clean data from main memory.
++ *One other cache has X in `MODIFIED (M)` state*: If CPU-B holds X in a `MODIFIED (M)` state, it means CPU-B has the most recent, "dirty" version of X (not yet written back to main memory). CPU-B's cache controller *intercepts* CPU-A's read request. CPU-B then writes its `MODIFIED` data block X back to main memory. After this write-back, CPU-B's cache's state for X downgrades from `MODIFIED (M)` to `SHARED (S)`. Finally, CPU-A loads data block X from the now updated main memory, and its cache's state for X becomes `SHARED (S)`. This ensures that the dirty data is updated in main memory before any other processor can access it.
+
+==== Read Hit
+A "Read Hit" means the CPU wants to read a data block that is already present in its local cache and is in a valid state. CPU-A wants to read data block X, and X is currently in either `Modified` or `Shared` state in CPU-A's local cache.
++ *Cache Hit with `Shared (S)` State*. CPU-A's cache has X in `SHARED (S)`; other caches might also have X in `SHARED (S)`; main memory is up-to-date. CPU-A's cache controller finds X in its local cache in `SHARED` state. Since `SHARED` implies the data is clean and can be read by multiple caches, CPU-A directly reads data block X from its local cache. *No bus transactions occur*, and X's state in CPU-A's cache remains `SHARED (S)`. This is the most efficient read scenario.
++ *Cache Hit with `Modified (M)` State*. CPU-A's cache has X in `MODIFIED (M)`; other caches have X in `INVALID (I)` (if copies exist); main memory is stale (as M state is "dirty"). CPU-A's cache controller finds X in its local cache in `MODIFIED` state. This signifies that CPU-A has the most recent, exclusive, and modified version of X. CPU-A directly reads data block X from its local cache. No bus transactions occur, and X's state in CPU-A's cache remains `MODIFIED (M)`. Even though the data is "dirty" (inconsistent with main memory), CPU-A's exclusive ownership allows for a highly efficient local read.
+
+==== Write Miss
+A "Write Miss" occurs when CPU-A wants to write to data block X, but X is either not in its local cache or is in an INVALID (I) state. To perform the write, CPU-A's cache must first obtain a valid (and exclusive) copy of the data block.
+
+CPU-A attempts to write to X, but its cache shows X is absent or `INVALID`. To gain exclusive write access, CPU-A's cache controller sends an *Write Invalidate Request* onto the bus. This request includes X's address and signals the intent to obtain exclusive ownership. All other caches (e.g., CPU-B, CPU-C) snoop this request, checking their own copies of X and their states. Responses Based on other caches' states:
++ *No other valid copies or all `INVALID (I)`*: If X isn't in any other cache or all copies are `INVALID`, main memory is the current, authoritative source. CPU-A loads data block X from main memory. Upon loading, X's state in CPU-A's cache becomes `MODIFIED (M)`. CPU-A then performs its write operation. CPU-A becomes the sole, "dirty" owner.
++ *At least one other cache holds `SHARED (S)` copies*: If other caches (e.g., CPU-B, CPU-C) hold X in a `SHARED (S)` state. Since CPU-A needs exclusive ownership for writing, these `SHARED` copies must be invalidated. CPU-B and CPU-C's copies of X transition to `INVALID (I)`. CPU-A loads data block X from main memory (as main memory is clean). CPU-A's cache's state for X becomes `MODIFIED (M)`, and it performs its write. Shared copies are invalidated to grant exclusive write access.
++ *One other cache (e.g., CPU-B) holds a `MODIFIED (M)` copy*: If CPU-B holds X in a `MODIFIED (M)` state, it has the most recent, "dirty" version. CPU-B *intercepts* the request. CPU-B writes its `MODIFIED` data block X back to main memory (to ensure main memory is updated). After the write-back, CPU-B's cache's state for X transitions from `MODIFIED (M)` to `INVALID (I)` (as CPU-A is taking exclusive ownership). Once main memory is updated, CPU-A loads data block X from main memory. X's state in CPU-A's cache becomes MODIFIED (M), and it performs its write. The dirty owner must write back and invalidate its copy to allow the new writer exclusive access, potentially introducing latency.
+
+==== Write Hit
+A "Write Hit" means CPU-A wants to write to data block X, and X is already present in its local cache in a valid state. In the MSI protocol, valid states are `Modified (M)` and `Shared (S)`. CPU-A's cache line for X is currently in either Modified or Shared state.
++ *Write Hit with `Shared (S)` State: CPU-A's cache has X in `SHARED (S)`*; other caches may also have X in `SHARED (S)`; main memory is up-to-date. CPU-A finds X in `SHARED` state in its local cache. Since `SHARED` implies read-only and potentially shared copies, CPU-A must gain exclusive write permission. It sends an Invalidate Request onto the bus, which broadcasts to all other caches. Any other caches with X's copy then change its state to `INVALID (I)`. CPU-A then upgrades its cache's state for X from `SHARED (S)` to `MODIFIED (M)` and performs its write operation. This transition from shared to exclusive modification requires a bus transaction to invalidate other copies.
++ *Write Hit with `Modified (M)` State:* CPU-A's cache has X in `MODIFIED (M)`; other caches have X in `INVALID (I)` (if copies exist); main memory is stale (due to the "dirty" M state). CPU-A finds X in `MODIFIED` state in its local cache. `MODIFIED` signifies that CPU-A already holds the most recent, exclusive copy of X. Therefore, CPU-A does not need to send any bus transactions (no invalidate requests are necessary as there are no other valid copies). CPU-A directly performs its write operation on the data block X in its local cache, and X's state remains `MODIFIED (M)`. This is the most efficient write scenario, occurring locally without any external bus activity.
+
+=== MESI Protocol
+The *MESI protocol* is an extension of the MSI protocol, and it's one of the most commonly used and fundamental cache coherence protocols in modern multi-core processors. It adds a new state, *Exclusive (E)*, to the three states of MSI (Modified, Shared, Invalid).
+- *Modified (M)*: The cache line is present in the cache and has been modified (dirty). It is the only copy of the data, and it is not present in main memory. When another CPU reads this cache line, the data must be written back to main memory, and then its state is downgraded to `Shared (S)`.
+- *Exclusive (E)*: The cache line exists only in the current CPU's cache; *no other cache has a copy of this cache line*. Its state means that the data in the cache is consistent with the main memory data ("clean"). If the CPU wants to modify a cache line that is in the Exclusive state, it does not need to send an invalidate signal to the bus (because there are no other copies to invalidate). It can directly change its state to Modified and proceed with the modification. This saves bus bandwidth and reduces latency.
+- *Shared (S)*: The cache line exists in multiple CPUs' caches. The data in the cache is *consistent* with the main memory data ("clean").
+- *Invalid (I)*: The cache line does not contain valid data. When the CPU reads or writes to this cache line and experiences a miss, it needs to fetch the data from main memory or another cache, and then its state becomes Exclusive or Shared depending on the circumstances.
+
+==== Read Miss
+Responses based on X's state in other caches:
++ *No other valid copies or all `INVALID (I)`*: CPU-A loads data block X from *main memory*. X's state in CPU-A's cache becomes `EXCLUSIVE (E)`.
++ *At least one other cache has X in `SHARED (S)` state:* Data block X is present in *main memory* (and is up-to-date), and other caches (e.g., CPU-B) also hold clean, `SHARED` copies. Data block X is present in main memory (and is up-to-date), and other caches (e.g., CPU-B) also hold clean, `SHARED` copies. X's state in other caches (like CPU-B) remains `SHARED (S)`.
++ *One other cache (e.g., CPU-B) has X in `MODIFIED (M)` state:* Data block X in CPU-B's cache is the most recent version, but it's dirty. Main memory's copy is stale. CPU-B's cache controller snoops CPU-A's read request and finds its `MODIFIED` copy. CPU-B *intercepts* the read request, preventing it from going to main memory directly. CPU-B writes its `MODIFIED` data block X back to main memory (updating main memory). Simultaneously (or immediately after the write-back), CPU-B's cache's state for X downgrades from `MODIFIED (M)` to `SHARED (S)`. Once main memory is updated (or if a direct cache-to-cache transfer optimization is used, CPU-B might directly supply the data to CPU-A), CPU-A loads data block X from the now consistent *main memory (or directly from CPU-B)*.
++ *One other cache (e.g., CPU-B) has X in `EXCLUSIVE (E)` state*: CPU-B's cache controller snoops CPU-A's read request and finds its `EXCLUSIVE` copy. Since CPU-A also wants a copy, CPU-B is no longer the exclusive owner. CPU-B directly transfers data block X to CPU-A (often cache-to-cache via the bus). Crucially, no write-back to main memory is needed because the data is already clean. CPU-B's cache's state for X downgrades from `EXCLUSIVE (E)` to `SHARED (S)`.
+
+==== Read Hit
++ *X is in `SHARED (S)` state*: CPU-A simply reads data block X directly from its local cache. The state of X in CPU-A's cache remains `SHARED (S)`. No bus activity occurs.
++ *X is in `EXCLUSIVE (E)` state:* CPU-A directly reads data block X from its local cache. The state of X in CPU-A's cache remains `EXCLUSIVE (E)`. No bus activity occurs.
++ *X is in `MODIFIED (M)` state:* CPU-A directly reads data block X from its local cache. The state of X in CPU-A's cache remains `MODIFIED (M)`. No bus activity occurs.
+
+==== Write Miss
++ *No other valid copies or all `INVALID (I)`*: Main memory is the definitive source for X (if it exists), and the data in main memory is up-to-date (as no cache has modified it). CPU-A loads data block X from main memory. X's state in CPU-A's cache becomes `MODIFIED (M)`. CPU-A then performs its write operation on the data block.
++ *At least one other cache has X in `SHARED (S)` state*: CPU-B and CPU-C's cache controllers snoop the RFO request. They recognize that CPU-A needs exclusive write access. Their copies of X transition from `SHARED (S)` to `INVALID (I)`. This is the "invalidate" part of the write-invalidate protocol. CPU-A loads data block X from *main memory* (as main memory is clean). X's state in CPU-A's cache becomes `MODIFIED (M)`. CPU-A then performs its write operation.
++ *One other cache (e.g., CPU-B) has X in `EXCLUSIVE (E)` state:* CPU-B's cache controller snoops the RFO request and finds its `EXCLUSIVE` copy. Since CPU-A needs write access (and thus exclusive ownership), CPU-B's copy must become invalid. CPU-B's cache's state for X transitions from `EXCLUSIVE (E)` to `INVALID (I)`. CPU-A loads data block X from main memory (or in some optimized implementations, directly from CPU-B's cache, even though the state becomes invalid).
++ *One other cache (e.g., CPU-B) has X in `MODIFIED (M)` state:* CPU-B's cache controller snoops the RFO request and finds its `MODIFIED` copy. CPU-B *intercepts* the RFO request. It's responsible for providing the latest data. CPU-B writes its `MODIFIED` data block X back to main memory (updating main memory). CPU-B's cache's state for X transitions from `MODIFIED (M)` to `INVALID (I)` (as CPU-A is taking exclusive ownership).
++ Once main memory is updated (or if a direct cache-to-cache transfer optimization is used, CPU-B might directly supply the data to CPU-A while simultaneously writing back to memory), CPU-A loads data block X from the now consistent *main memory* (or directly from CPU-B). X's state in CPU-A's cache becomes `MODIFIED (M)`. CPU-A then performs its write operation.
+
+==== Write Hit
++ *X is in `SHARED (S)` state*: CPU-A finds X in `SHARED` state in its local cache. Since SHARED implies the data is clean but read-only and potentially shared, CPU-A must gain exclusive write permission. CPU-A sends an "*Invalidate Request*" onto the bus. This request broadcasts to all other caches. All other caches that have a copy of data block X snoop this invalidate request and immediately change their copy's state to `INVALID (I)`. CPU-A upgrades its own cache's state for X from `SHARED (S)` to `MODIFIED (M)`. CPU-A then performs its write operation, modifying the data in its cache.
++ *X is in `EXCLUSIVE (E)` state:* CPU-A finds X in `EXCLUSIVE` state in its local cache. Since `EXCLUSIVE` implies CPU-A is already the sole owner of this data block, and the data is clean, CPU-A does not need to send any bus transactions (no invalidate requests are necessary as there are no other copies to invalidate). CPU-A directly upgrades its own cache's state for X from `EXCLUSIVE (E)` to `MODIFIED (M)`. CPU-A then performs its write operation on the data block in its local cache.
++ *X is in `MODIFIED (M)` state*: CPU-A finds X in `MODIFIED` state in its local cache. `MODIFIED` signifies that CPU-A already holds the most recent, exclusive, and dirty copy of X. Therefore, CPU-A does not need to send any bus transactions. It already has full and exclusive control over the latest data. CPU-A directly performs its write operation on data block X in its local cache. The state of X in CPU-A's cache remains `MODIFIED (M)`.
 
 #pagebreak()
 
