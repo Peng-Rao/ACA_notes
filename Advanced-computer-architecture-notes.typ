@@ -18,8 +18,9 @@
     ),
   ),
   // cover-image: "./figures/polimi_logo.png",
-  background-color: "#FAF9DE",
+  background-color: "#DDEEDD",
 )
+#set text(fill: rgb("#000000"))
 #set math.mat(delim: "[")
 #set math.vec(delim: "[")
 #set math.equation(supplement: [Eq.])
@@ -1223,6 +1224,28 @@ Usually: Miss Rate I\$ << Miss Rate D\$
 Multiprocessors now play a major role from embedded to high end general-purpose computing. The main goal of Multiprocessors is to achieve *high-end performance, scalability, and reliability*.
 
 Multiprocessors refers to tightly coupled processors whose coordination and usage is controlled by a single operating system and that usually share memory through a shared address space.
+
+Existing shared-memory multiprocessors fall into *two classes*, depending on the number of processors involved, which in turn dictates a memory organization and interconnect strategy.
+
+The first group, which we call *_symmetric (shared-memory) multiprocessors (SMPs)_*, or *_centralized shared-memory multiprocessors_*, features small to moderate numbers of cores, typically 32 or fewer.
+
+SMP architectures are also sometimes called _*uniform memory access (UMA)*_ multiprocessors, arising from the fact that all processors have a uniform latency from memory, even if the memory is organized into multiple banks.
+
+#figure(
+  image("figures/SMP.jpg", width: 80%),
+  caption: "Basic structure of a centralized shared-memory multiprocessor based on a multicore chip.",
+)
+
+The alternative design approach consists of multiprocessors with physically distributed memory, called _*distributed shared memory (DSM)*_.
+
+Distributing the memory among the nodes both increases the bandwidth and reduces the latency to local memory. A DSM multiprocessor is also called a _*NUMA (nonuniform memory access)*_ because the access time depends on the location of a data word in memory.
+
+#figure(
+  image("figures/DSM.jpg", width: 80%),
+  caption: "The basic architecture of a distributed-memory multiprocessor",
+)
+
+*In both SMP and DSM architectures, communication among threads occurs through a shared address space, meaning that a memory reference can be made by any processor to any memory location, assuming it has the correct access rights*. The term shared memory associated with both SMP and DSM refers to the fact that the address space is shared.
 
 == The connection network
 Processors in a multiprocessor system need to be interconnected to facilitate communication and data sharing.
