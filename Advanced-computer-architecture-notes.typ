@@ -1334,10 +1334,29 @@ The physical memory is divided into memory modules distributed on each single pr
 
 Multiprocessor systems can have single address space and distributed physical memory. The concepts of addressing space (single/multiple) and the physical memory organization *orthogonal* to each other.
 
+#pagebreak()
+
 == Cache Coherence
 Shared-Memory Architectures cache both *private data* (used by a single processor) and *shared data* (used by multiple processors to provide communication).
 
-When shared data are cached, *the shared values may be replicated in multiple caches*. In addition to the reduction in access latency and required memory bandwidth, this replication provides a reduction of shared data contention read by multiple processors simultaneously. The use of multiple copies of same data introduces a new problem: cache coherence.
+When shared data are cached, *the shared values may be replicated in multiple caches*. In addition to the reduction in access latency and required memory bandwidth, this replication provides a reduction of shared data contention read by multiple processors simultaneously. The use of multiple copies of same data introduces a new problem: *_cache coherence_*.
+
+#definition("Coherence")[
+  A memory system is coherent if
+  + A read by processor P to location X that follows a write by P to X, with no writes of X by another processor occurring between the write and the read by P, always returns the value written by P.
+  + A read by a processor to location X that follows a write by another processor to X returns the written value if the read and write are sufficiently separated in time and no other writes to X occur between the two accesses.
+  + Writes to the same location are serialized; that is, two writes to the same location by any two processors are seen in the same order by all processors. For example, if the values 1 and then 2 are written to a location, processors can never read the value of the location as 2 and then later read it as 1.
+
+  Make sure:
+  - *_Write Propagation_*: Write operations at a certain position are eventually visible to other cores.
+  - *_Write Serialization_*: If two processors write to the same memory location, all other processors see the writes in the same order.
+]
+
+#attention("Cache Coherence")[
+  Notice that the coherence problem exists because we have both a *global state*, defined primarily by the main memory, and a *local state*, defined by the individual caches, which are private to each processor core. Thus, in a multi-core where some level of caching may be shared (e.g., an L3), although some levels are private (e.g., L1 and L2), the coherence problem still exists and must be solved.
+]
+
+When a processor writes to a shared data item, it must ensure that all other processors see the most recent value. If one processor writes to a shared variable, all other processors must see the new value when they read it.
 
 Because the view of memory held by two different processors is through their individual caches, the processors could end up seeing different values for the same memory location, as the following figure shows.
 
