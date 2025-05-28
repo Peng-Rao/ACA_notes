@@ -1367,7 +1367,7 @@ Because the view of memory held by two different processors is through their ind
 
 Maintain coherence has two components: *read* and *write*. Actually, multiple copies are not a problem when reading, but a processor must have exclusive access to write a word. Processors must have the most recent copy when reading an object, so all processors must get new values after a write.
 
-The protocols to maintain coherence for multiple processors are called cache _*coherence protocols*_. Key to implementing a cache coherence protocol is tracking the state of any sharing of a data block. There are two classes of protocols in use, each of which uses different techniques to track the sharing status.
+The *_protocols_* to maintain coherence for multiple processors are called cache _*coherence protocols*_. Key to implementing a cache coherence protocol is tracking the state of any sharing of a data block. There are two classes of protocols in use, each of which uses different techniques to track the sharing status.
 
 === Snooping Protocols
 All cache controllers monitor (*snoop*) on the bus to determine whether or not they have a copy of the block requested on the bus and respond accordingly. Every cache that has a copy of the shared block, also has a copy of the sharing state of the block, and no centralized state is kept. Suitable for Centralized Shared-Memory Architectures, and in particular for small scale multiprocessors with single snoopy bus.
@@ -1386,23 +1386,18 @@ The writing processor issues an invalidation signal over the bus to cause all co
 
 All caches on the bus check to see if they have a copy of the data and, if so, they must *invalidate* the block containing the data. This scheme allows *multiple* readers but only a *single* writer.
 
-The scheme uses the bus only on the first write to invalidate the other copies, and subsequent writes do not result in bus activity. This protocol provides similar benefits to write-back protocols in terms of reducing demands on bus bandwidth.
+The scheme uses the bus only on the first write to invalidate the other copies, and subsequent writes do not result in bus activity. This protocol provides similar benefits to *_write-back_* protocols in terms of reducing demands on bus bandwidth.
 
 ==== Write-Update Protocol
 The writing processor broadcasts the new data over the bus; all caches check if they have a copy of the data and, if so, all copies are *updated* with the new value.
 
-This scheme requires the *continuous broadcast* of writes to shared data (while write-invalidate deletes all other copies so that there is only one local copy for subsequent writes). This protocol is like write-through because all writes go over the bus to update copies of the shared data.
+This scheme requires the *continuous broadcast* of writes to shared data (while write-invalidate deletes all other copies so that there is only one local copy for subsequent writes). This protocol is like *_write-through_* because all writes go over the bus to update copies of the shared data.
 
 === MSI Protocol
 The *MSI protocol* is a write-invalidate protocol that uses three states to track the status of a cache line:
-- *Modified (or Dirty):* cache has only copy, its writeable, and dirty (block cannot be shared anymore)
-- *Shared (or Clean)* (read only): the block is clean (not modified) and can be read
-- *Invalid:* block contains no valid data
-
-Each block of memory is in one of three states:
-- *Shared* in all caches and up-to-date in memory (Clean)
-- *Modified* in exactly one cache (Dirty)
-- *Uncached* when not in any caches
+- *Modified (M)*: The cache line is present in the cache and has been modified (dirty). It is the only copy of the data, and it is not present in main memory. When another CPU reads this cache line, the data must be written back to main memory, and then its state is downgraded to `Shared (S)`.
+- *Shared (S)*: The cache line exists in multiple CPUs' caches. The data in the cache is *consistent* with the main memory data ("clean").
+- *Invalid (I)*: The cache line does not contain valid data. When the CPU reads or writes to this cache line and experiences a miss, it needs to fetch the data from main memory or another cache, and then its state becomes Exclusive or Shared depending on the circumstances.
 
 Let us consider the following case.
 \
@@ -1434,10 +1429,7 @@ A "Write Hit" means CPU-A wants to write to data block X, and X is already prese
 
 === MESI Protocol
 The *MESI protocol* is an extension of the MSI protocol, and it's one of the most commonly used and fundamental cache coherence protocols in modern multi-core processors. It adds a new state, *Exclusive (E)*, to the three states of MSI (Modified, Shared, Invalid).
-- *Modified (M)*: The cache line is present in the cache and has been modified (dirty). It is the only copy of the data, and it is not present in main memory. When another CPU reads this cache line, the data must be written back to main memory, and then its state is downgraded to `Shared (S)`.
 - *Exclusive (E)*: The cache line exists only in the current CPU's cache; *no other cache has a copy of this cache line*. Its state means that the data in the cache is consistent with the main memory data ("clean"). If the CPU wants to modify a cache line that is in the Exclusive state, it does not need to send an invalidate signal to the bus (because there are no other copies to invalidate). It can directly change its state to Modified and proceed with the modification. This saves bus bandwidth and reduces latency.
-- *Shared (S)*: The cache line exists in multiple CPUs' caches. The data in the cache is *consistent* with the main memory data ("clean").
-- *Invalid (I)*: The cache line does not contain valid data. When the CPU reads or writes to this cache line and experiences a miss, it needs to fetch the data from main memory or another cache, and then its state becomes Exclusive or Shared depending on the circumstances.
 
 ==== Read Miss
 Responses based on X's state in other caches:
@@ -1462,6 +1454,34 @@ Responses based on X's state in other caches:
 + *X is in `SHARED (S)` state*: CPU-A finds X in `SHARED` state in its local cache. Since SHARED implies the data is clean but read-only and potentially shared, CPU-A must gain exclusive write permission. CPU-A sends an "*Invalidate Request*" onto the bus. This request broadcasts to all other caches. All other caches that have a copy of data block X snoop this invalidate request and immediately change their copy's state to `INVALID (I)`. CPU-A upgrades its own cache's state for X from `SHARED (S)` to `MODIFIED (M)`. CPU-A then performs its write operation, modifying the data in its cache.
 + *X is in `EXCLUSIVE (E)` state:* CPU-A finds X in `EXCLUSIVE` state in its local cache. Since `EXCLUSIVE` implies CPU-A is already the sole owner of this data block, and the data is clean, CPU-A does not need to send any bus transactions (no invalidate requests are necessary as there are no other copies to invalidate). CPU-A directly upgrades its own cache's state for X from `EXCLUSIVE (E)` to `MODIFIED (M)`. CPU-A then performs its write operation on the data block in its local cache.
 + *X is in `MODIFIED (M)` state*: CPU-A finds X in `MODIFIED` state in its local cache. `MODIFIED` signifies that CPU-A already holds the most recent, exclusive, and dirty copy of X. Therefore, CPU-A does not need to send any bus transactions. It already has full and exclusive control over the latest data. CPU-A directly performs its write operation on data block X in its local cache. The state of X in CPU-A's cache remains `MODIFIED (M)`.
+
+=== Directory Protocols
+A directory protocol is a cache coherence protocol that uses a centralized directory to track the state of each cache line and its copies across multiple caches.
+
+Each entry in the directory is associated to each block in the main memory (directory size is proportional to the number of memory blocks times the number of processors).
+
+In *_Centralized Shared-Memory architectures_* (such as Symmetric Multiprocessors), there is a single directory associated to the main memory.
+
+For _*Distributed Shared-Memory architectures*_, the directory is distributed on the nodes (one directory for each memory module) to avoid bottlenecks. Even if the entries of the directory are distributed, the sharing state of a block is stored in a single location in the directory.
+
+The physical address space is statically distributed to the nodes. There is an overall mapping of each memory block address to each node: given a memory block address, it is known its home node (i.e. the node where reside the memory block and the directory). To avoid broadcast, send point-to-point messages to the home node of the block, leading to a *Message Passing Protocol*. Directory-based protocols are _*better scalable*_ than snooping protocols.
+
+#figure(
+  image("figures/distributed-directory.jpg", width: 80%),
+  caption: "A directory is added to each node to implement cache coherence in a distributed-memory multi-processor.",
+)
+
+The directory maintains info regarding:
+- The coherence state of each block
+- Which processor(s) has (have) a copy of the block (usually bit vector, 1 if processor has copy).
+- Which processor is the *owner* of the block (when the block is in the exclusive state, 1 if processor is owner).
+
+In a simple protocol, these states could be the following:
+- _*Shared*_ --- One or more nodes have the block cached, and the value in memory is up to date (as well as in all the caches).
+- _*Uncached*_ --- No node has a copy of the cache block.
+- _*Modified*_ --- Exactly one node has a copy of the cache block, and it has written the block, so the memory copy is out of date. The processor is called the owner of the block.
+
+
 
 #pagebreak()
 
