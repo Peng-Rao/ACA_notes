@@ -1476,13 +1476,61 @@ The directory maintains info regarding:
 - Which processor(s) has (have) a copy of the block (usually bit vector, 1 if processor has copy).
 - Which processor is the *owner* of the block (when the block is in the exclusive state, 1 if processor is owner).
 
+#definition("Local, Home and Remote Nodes")[
+  - *Home node* where the memory address (and directory entry) resides
+  - *Local node* where a request originates
+  - *Remote node* where there is a cached copy of the block, whether dirty or shared
+]
+
+Directory-based protocol must implement two primary operations:
+- *Handle* a read miss.
+- *Handle* a write to a shared, clean cache block.
+
+To implement these operations, the directory must *track* the *state* of each cache block (Uncached, Shared, Modified).
+
 In a simple protocol, these states could be the following:
 - _*Shared*_ --- One or more nodes have the block cached, and the value in memory is up to date (as well as in all the caches).
 - _*Uncached*_ --- No node has a copy of the cache block.
 - _*Modified*_ --- Exactly one node has a copy of the cache block, and it has written the block, so the memory copy is out of date. The processor is called the owner of the block.
 
+#figure(
+  image("figures/the-message-to-maintain-coherence.jpg", width: 80%),
+  caption: "The possible messages sent among nodes to maintain coherence",
+)
 
+=== Unchanged State
+When a block is in the uncached state, the copy in memory is the current value, so the only possible requests for that block are
+- *Read Miss from local cache (ex. N1):* Requested data are sent by Data Value Reply from home memory N0 to local cache C1 and requestor N1 is made the only sharing node. The state of the block is made S. #table(
+    columns: (0.4fr, 1fr, 1fr),
+    table.header[Block][Coherence State][Sharer / Owner Bits],
+    [B0], [Shared], [0 1 0 0],
+  )
 
+When a block is in the shared state, the copy in memory is up to date, so the possible requests are
+- *Write Miss from local cache (ex. N1):* Requested data are sent by Data Value Reply from home memory N0 to local cache C1 and N1 becomes the owner node. The block is made M to indicate that the only valid copy is cached. Sharer bits indicate the identity of the owner of the block. #table(
+    columns: (0.4fr, 1fr, 1fr),
+    table.header[Block][Coherence State][Sharer / Owner Bits],
+    [B0], [Modified], [0 1 0 0],
+  )
+
+=== Shared State
+When a directory block B0 in home N0 is in the *shared state*, the memory value is up to date, we can have: #table(
+  columns: (0.4fr, 1fr, 1fr),
+  table.header[Block][Coherence State][Sharer / Owner Bits],
+  [B0], [Modified], [0 1 0 0],
+)
+- *Read Miss from local cache (ex. N2):* Requested data are sent by *Data Value Reply* from home memory N0 to local cache C2 and the requestor (ex. N2) is added to the Sharer bits. The state of the block stays *S*. #table(
+    columns: (0.4fr, 1fr, 1fr),
+    table.header[Block][Coherence State][Sharer / Owner Bits],
+    [B0], [Shared], [0 1 1 0],
+  )
+- *Write Miss from local cache (ex. N2):* Requested data are sent by *Data Value Reply* from home memory N0 to local cache C2. Invalidate messages are sent from home N0 to remote sharer(s) (P1) and bits are set to the identity of requestor (P2 owner). The state of the block becomes *M*. #table(
+    columns: (0.4fr, 1fr, 1fr),
+    table.header[Block][Coherence State][Sharer / Owner Bits],
+    [B0], [Modified], [0 0 1 0],
+  )
+
+=== Modified State
 #pagebreak()
 
 #bibliography("references.bib")
