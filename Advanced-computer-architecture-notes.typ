@@ -1498,7 +1498,7 @@ In a simple protocol, these states could be the following:
   caption: "The possible messages sent among nodes to maintain coherence",
 )
 
-=== Unchanged State
+=== Uncached State
 When a block is in the uncached state, the copy in memory is the current value, so the only possible requests for that block are
 - *Read Miss from local cache (ex. N1):* Requested data are sent by Data Value Reply from home memory N0 to local cache C1 and requestor N1 is made the only sharing node. The state of the block is made S. #table(
     columns: (0.4fr, 1fr, 1fr),
@@ -1531,6 +1531,26 @@ When a directory block B0 in home N0 is in the *shared state*, the memory value 
   )
 
 === Modified State
+When a directory block B0 in home N0 is in the *M state*, the current value of the block is held *in the cache* of the *owner* processor (ex. P1) identified by the sharer bits, so 3 possible requests can occur: #table(
+  columns: (0.4fr, 1fr, 1fr),
+  table.header[Block][Coherence State][Sharer / Owner Bits],
+  [B0], [Modified], [0 1 0 0],
+)
+- *Read Miss from local cache (ex. N2):* To the owner node P1 is sent a *Fetch* message, causing state of the block in the owner's cache to transition to S and the owner send data to the home directory (through *Data Write Back*); data written to home memory are sent to requesting cache N2 by *Data Value Reply*. The identity of the requesting processor (P2) is added to the Sharers set, which still contains the identity of the processor that was the owner (since it still has a readable copy). Block state in directory is set to S. #table(
+    columns: (0.4fr, 1fr, 1fr),
+    table.header[Block][Coherence State][Sharer / Owner Bits],
+    [B0], [Shared], [0 1 1 0],
+  )
+- *Data Write-Back from remote owner:* The owner cache is replacing the block and therefore must write it back to home. This make the memory copy up to date (the home dir. becomes the *owner*), the block becomes U, and the Sharer set is empty. #table(
+    columns: (0.4fr, 1fr, 1fr),
+    table.header[Block][Coherence State][Sharer / Owner Bits],
+    [B0], [Uncached], [],
+  )
+- *Write Miss local cache (ex. N2)*: A *Fetch/Inv*. msg is sent to the *old owner* (ex. N1) causing to *invalidate* the cache block and the cache C1 to send data to the home directory (*Data Write Back*), from which the data are sent to the requesting node N2 (*Data Value Reply*), which becomes the new owner. Sharer is set to the identity of the new owner, and the state of the block remain M (but owner changed) #table(
+    columns: (0.4fr, 1fr, 1fr),
+    table.header[Block][Coherence State][Sharer / Owner Bits],
+    [B0], [Modified], [0 0 1 0],
+  )
 #pagebreak()
 
 #bibliography("references.bib")
