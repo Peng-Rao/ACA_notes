@@ -1225,7 +1225,7 @@ Multiprocessors now play a major role from embedded to high end general-purpose 
 
 Multiprocessors refers to tightly coupled processors whose coordination and usage is controlled by a single operating system and that usually share memory through a shared address space.
 
-Existing shared-memory multiprocessors fall into *two classes*, depending on the number of processors involved, which in turn dictates a memory organization and interconnect strategy.
+Existing *shared-memory multiprocessors* fall into *two classes*, depending on the number of processors involved, which in turn dictates a memory organization and interconnect strategy.
 
 The first group, which we call *_symmetric (shared-memory) multiprocessors (SMPs)_*, or *_centralized shared-memory multiprocessors_*, features small to moderate numbers of cores, typically 32 or fewer.
 
@@ -1247,7 +1247,9 @@ Distributing the memory among the nodes both increases the bandwidth and reduces
 
 *In both SMP and DSM architectures, communication among threads occurs through a shared address space, meaning that a memory reference can be made by any processor to any memory location, assuming it has the correct access rights*. The term shared memory associated with both SMP and DSM refers to the fact that the address space is shared.
 
-== The connection network
+#pagebreak()
+
+== The connection network topologies
 Processors in a multiprocessor system need to be interconnected to facilitate communication and data sharing.
 
 === Network Representation and Costs
@@ -1302,6 +1304,31 @@ For single-bus topology, we calculate the metrics of performance:
   image("figures/ring-topology.jpg", width: 80%),
   caption: "The topology of a ring multiprocessor",
 )
+
+=== Crossbar Network
+Crossbar Network or fully connected network: every processor has a bidirectional dedicated communication link to every other processor, and it has a very high cost.
+
+#figure(
+  image("figures/crossbar-topology.jpg", width: 80%),
+  caption: "The topology of a crossbar multiprocessor",
+)
+
++ *Total Bandwidth*: $(P times (P - 1)) / 2 times b$
++ *Bisection Bandwidth*: $(P / 2)^2 times b$
+
+=== Bidimensional Mesh
+Given $P$ nodes: $N=sqrt(P)$, there are $N times (N - 1)$ *horizontal channels* and $N times (N - 1)$ *vertical channels*.
+- Number of links per internal switch $=5$
+- Number of links per external switch $=3$
+- *Total Bandwidth*: $2 times N times (N - 1) times b$
+- *Bisection Bandwidth*: $N times b$
+
+#figure(
+  image("figures/bidimensional-mesh-topology.jpg", width: 60%),
+  caption: "The topology of a bidimensional mesh multiprocessor",
+)
+
+#pagebreak()
 
 == Memory Address Space
 There are two types of memory address space model:
@@ -1498,6 +1525,11 @@ In a simple protocol, these states could be the following:
   caption: "The possible messages sent among nodes to maintain coherence",
 )
 
+Three possible coherence states for each cache block in the directory:
+- *Uncached*: no processor has a copy of the cache block; block not valid in any cache;
+- *Shared*: one or more processors have cache block, and memory is up-to-date; sharer set of proc. IDs;
+- *Modified*: only one processor (the *owner*) has data that has been modified so the memory is out-of-date;
+
 === Uncached State
 When a block is in the uncached state, the copy in memory is the current value, so the only possible requests for that block are
 - *Read Miss from local cache (ex. N1):* Requested data are sent by Data Value Reply from home memory N0 to local cache C1 and requestor N1 is made the only sharing node. The state of the block is made S. #table(
@@ -1551,6 +1583,7 @@ When a directory block B0 in home N0 is in the *M state*, the current value of t
     table.header[Block][Coherence State][Sharer / Owner Bits],
     [B0], [Modified], [0 0 1 0],
   )
+
 #pagebreak()
 
 #bibliography("references.bib")
