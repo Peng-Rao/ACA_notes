@@ -1332,7 +1332,7 @@ Given $P$ nodes: $N=sqrt(P)$, there are $N times (N - 1)$ *horizontal channels* 
 
 == Memory Address Space
 There are two types of memory address space model:
-- Single logically shared address space: A memory reference can be made by any processor to any memory location through loads/stores, it is also known as *shared memory architecture*. The address space is shared among processors: The same physical address on 2 processors refers to the same location in memory.
+- *Single logically shared address space (symmetric multiprocessors)*: A memory reference can be made by any processor to any memory location through loads/stores, it is also known as *shared memory architecture*. The address space is shared among processors: The same physical address on 2 processors refers to the same location in memory.
 - *Multiple and private address spaces*: The processors communicate among them through send/receive primitives, it is also known as *message passing architecture*. The address space is logically disjoint and cannot be addressed by different processors: the same physical address on 2 processors refers to 2 different locations in 2 different memories.
 
 === Shared Addresses
@@ -1353,13 +1353,29 @@ The processors communicate among them through sending/receiving messages: *messa
   caption: "Physical Memory Organization",
 )
 ==== Centralized Memory
+
 *UMA (Uniform Memory Access)*: The access time to a memory location is *uniform* for all the processors: no matter which processor requests it and no matter which word is asked.
+
 ==== Distributed Memory
+
 The physical memory is divided into memory modules distributed on each single processor.
 
 *NUMA (Non Uniform Memory Access)*: The access time to a memory location is *non uniform* for all the processors: it depends on the location of the data word in memory and the processor location.
 
 Multiprocessor systems can have single address space and distributed physical memory. The concepts of addressing space (single/multiple) and the physical memory organization *orthogonal* to each other.
+
+=== Summary
+#table(
+  columns: (0.6fr, 1fr, 1fr, 1fr),
+  table.header[Aspect][UMA][NUMA][DSM],
+  [Memory Location], [Centralized], [Distributed (per node)], [Distributed (across machines)],
+  [Latency], [Uniform (same for all CPUs)], [Non-uniform (local vs. remote)], [Highly variable (network-bound)],
+  [Scalability], [Low (bus bottleneck)], [High (100s of CPUs)], [Very high (1000s of machines)],
+  [Hardware/Software], [Hardware], [Hardware], [Software abstraction],
+  [Complexity], [Low], [Medium (OS/data-aware apps)], [High (consistency protocols)],
+  [Shared Address Space], [✅ hardware-level], [✅ hardware-level], [✅ software abstraction],
+  [Use Case], [Small SMP systems], [Large servers/HPC], [Distributed compute clusters],
+)
 
 #pagebreak()
 
