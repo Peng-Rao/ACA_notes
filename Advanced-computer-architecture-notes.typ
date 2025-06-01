@@ -1412,8 +1412,10 @@ Maintain coherence has two components: *read* and *write*. Actually, multiple co
 
 The *_protocols_* to maintain coherence for multiple processors are called cache _*coherence protocols*_. Key to implementing a cache coherence protocol is tracking the state of any sharing of a data block. There are two classes of protocols in use, each of which uses different techniques to track the sharing status.
 
+Typically, the snooping protocols are used in *SMP*, while the directory protocols are used in *DSM*.
+
 === Snooping Protocols
-All cache controllers monitor (*snoop*) on the bus to determine whether or not they have a copy of the block requested on the bus and respond accordingly. Every cache that has a copy of the shared block, also has a copy of the sharing state of the block, and no centralized state is kept. Suitable for Centralized Shared-Memory Architectures, and in particular for small scale multiprocessors with single snoopy bus.
+All cache controllers monitor (*snoop*) on the bus to determine whether or not they have a copy of the block requested on the bus and respond accordingly. Every cache that has a copy of the shared block, also has a copy of the sharing state of the block, and no centralized state is kept. Suitable for *_Centralized Shared-Memory Architectures_*, and in particular for small scale multiprocessors with single snoopy bus.
 
 There are two types of snooping protocols depending on what happens on a write operation:
 - *Write-Invalidate Protocol*
