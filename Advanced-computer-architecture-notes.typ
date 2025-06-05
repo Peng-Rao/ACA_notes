@@ -1,4 +1,5 @@
 #import "@local/simple-note:0.0.1": *
+#import "@preview/cetz:0.3.4": *
 #show: codly-init.with()
 
 #show: simple-note.with(
@@ -1013,6 +1014,12 @@ A *dependence graph* captures true, anti and output dependencies between instruc
 
 = Advanced Memory Hierarchy
 == Introduction to caches
+We continue our introduction to caches by answering the four common questions
+for the first level of the memory hierarchy:
+- Q1: Where can a block be placed in the upper level? (*block placement*)
+- Q2: How is a block found if it is in the upper level? (*block identification*)
+- Q3: Which block should be replaced on a miss? (*block replacement*)
+- Q4: What happens on a write? (*write strategy*)
 #definition("Temporal Locality")[
   When there is a reference to one memory element, the trend is to refer again to the same memory element soon (i.e., instruction and data reused in loop bodies)
 ]
@@ -1025,7 +1032,9 @@ Caches exploit both types of predictability:
 - Exploit *temporal locality* by keeping the contents of recently accessed memory locations.
 - Exploit *spatial locality* by fetching blocks of data around recently accessed memory locations.
 
-=== Basic Concepts
+#pagebreak()
+
+== Basic Concepts
 - In general, the memory hierarchy is composed of several levels.
 - Let us consider 2 levels: cache and main memory
 - The cache (_upper level_) is smaller, faster and more expensive than the main memory (_lower level_).
@@ -1044,6 +1053,19 @@ In the case of a data miss, we need to:
 - To copy (write) the block in cache
 - To repeat the cache access (hit)
 
+Three major categories of cache misses:
+
+==== Compulsory Miss
+The first access to a block is not in the cache, so the block must be loaded in the cache from the main memory. Also called _cold start miss_ or _first reference miss_. There are compulsory misses even in an infinite cache: they are independent of the cache size.
+
+==== Capacity Miss
+If the cache cannot contain all the blocks needed during execution of a program, *_capacity misses_* will occur due to blocks being replaced and later retrieved. *Capacity misses decrease as capacity increases*.
+
+==== Conflict Miss
+If the block-placement strategy is *_set associative_* or _*direct mapped*_, *conflict misses* will occur because a block can be replaced and later retrieved when other blocks map to the same location in the cache.
+
+Conflict misses decrease as associativity increases. By definition, full associative caches avoid all conflict misses, but they are consuming area.
+
 === Cache Structure
 Each entry (cache line) in the cache includes:
 - *Valid bit* to indicate if this position contains valid data or not. At the bootstrap, all the entries in the cache are marked as `INVALID`
@@ -1055,11 +1077,26 @@ Each entry (cache line) in the cache includes:
   caption: "Cache Structure",
 )
 
-==== Block Placement
-Given the address of the block in the main memory, where the block can be placed in the cache? We need to find the correspondence between the memory address and the cache address of the block, the correspondence depends on the cache structure:
-- Direct Mapped Cache
-- Fully Associative Cache
-- n-way Set-Associative Cache
+#pagebreak()
+
+== Cache Placement
+There are three categories of cache organization:
+- If each block has only one place it can appear in the cache, the cache is said to be _*direct mapped*_. The mapping is usually #align(center)[(Block address) MOD (Number of blocks in cache)]
+- If a block can be placed anywhere in the cache, the cache is said to be _*fully associative*_.
+- If a block can be placed in a restricted set of places in the cache, the cache is *_set associative_*. A set is a group of blocks in the cache. A block is first mapped onto a set, and then the block can be placed anywhere within that set. The set is usually chosen by _bit selection_; that is, #align(center)[(Block address) MOD (Number of sets in cache)]
+
+#figure(
+  image("figures/cache-placement.jpg", width: 80%),
+  caption: "Cache Placement",
+)
+
+#pagebreak()
+
+== Cache Identification
+The processor address is cleverly divided into three parts:
++ _*Tag Field*_: Used for comparison to determine if there's a cache hit
++ *_Index Field_*: Selects which cache set to look in
++ *_Block Offset_*: Selects the specific data within the found block
 
 For *Direct Mapped Cache*, each memory location corresponds to one and only one cache location. The cache address of the block is given by:
 $
@@ -1071,7 +1108,7 @@ $
   caption: "Direct Mapped Cache",
 )
 
-For *fully associative cache*, the memory block can be placed in any position of the cache, all the cache blocks must be checked during the search of the block. The index does not exist in the memory address, there are the tag bits only
+For *Fully Associative Cache*, the memory block can be placed in any position of the cache, all the cache blocks must be checked during the search of the block. The index does not exist in the memory address, there are the tag bits only
 
 #figure(
   image("figures/fully-associative-cache.jpg", width: 60%),
@@ -1079,6 +1116,23 @@ For *fully associative cache*, the memory block can be placed in any position of
 )
 
 For *n-way set associative cache*, Cache composed of sets, each set composed of n blocks: Number of sets = Cache Size / (Block Size $times$ n)
+
+#pagebreak()
+
+== Cache Replacement
+When a cache miss occurs, the cache must decide which block to replace. The replacement policy is crucial for cache performance. Common policies include:
+- *Random*: To spread allocation uniformly, candidate blocks are randomly selected.
+- *_Least recently used (LRU)_*: The block that has not been used for the longest time is replaced.
+- _*First in, first out (FIFO)*_: Because LRU can be complicated to calculate, this approximates LRU by determining the oldest block rather than the LRU.
+
+== Cache Write Policy
+There are two policies to write data in the cache:
+- *Write-Through*: the information is written to both the block in the cache and to the block in the lower-level memory
+- *Write-Back*: the information is written only to the block in cache. The modified cache block is written to the lower-level memory *only when it is replaced due to a miss*.
+
+These are cache allocation policies that determine what happens when a write miss occurs (i.e., when the CPU tries to write to a memory location that is not currently in the cache).
+- *Write Allocate*: When a write miss occurs, the cache block is allocated in the cache, and the data is written to the cache block. *This is often used with write-back caches*.
+- *No Write Allocate*: When a write miss occurs, the data is written directly to the lower-level memory without allocating a cache block. *This is often used with write-through caches*.
 
 #example("cache structures")[
   Let us consider a memory hierarchy (main memory + cache) given by:
@@ -1095,16 +1149,6 @@ For *n-way set associative cache*, Cache composed of sets, each set composed of 
   - *Fully Associative Cache*: The block size is 256 words, so the offset is 8 bits ($256 = 2^8$). The number of cache blocks is 4096, so the index is 0 bits. The tag is 30 - 8 = 22 bits.
   - *2-way Set-Associative Cache*: The number of sets is $4096 / 2=2048$, so the index is 11 bits ($2048 = 2^11$). The block size is 256 words, so the offset is 8 bits ($256 = 2^8$). The tag is 30 - 11 - 8 = 11 bits.
 ]
-
-=== Write policy
-There are two policies to write data in the cache:
-- *Write-Through*: the information is written to both the block in the cache and to the block in the lower-level memory
-- *Write-Back*: the information is written only to the block in cache. The modified cache block is written to the lower-level memory only when it is replaced due to a miss.
-
-#figure(
-  image("figures/cache-summary.jpg", width: 80%),
-  caption: "Cache Summary",
-)
 
 #pagebreak()
 
