@@ -1,5 +1,6 @@
 #import "@local/simple-note:0.0.1": *
 #import "@preview/cetz:0.3.4": *
+#import "@preview/muchpdf:0.1.0": muchpdf
 #show: codly-init.with()
 
 #show: simple-note.with(
@@ -41,15 +42,15 @@ There are basically two kinds of parallelism in *applications*:
 + _Thread-level parallelism_ exploits either _data-level parallelism_ or _task-level parallelism_ in a tightly coupled hardware model that allows for interaction between parallel threads.
 + _Request-level parallelism_ exploits parallelism among largely decoupled tasks specified by the programmer or the operating system.
 
-== Registers in RISC-V
-RISC-V defines a set of *registers* that are part of the core ISA. RISC-V base ISA consists of 32 *_general-purpose registers_* `x0-x31` which hold integer values. The register `x0` is *hardwired* to the constant `0`. There is an additional user-visible *program counter* `pc` register which holds the address of the current instruction.
+All computers can be in one of the four categories:
+- *_Single instruction stream, single data stream_* (SISD) --- This category is the uniprocessor. It can exploit ILP, such as superscalar and speculative execution.
+- _*Single instruction stream, multiple data streams*_ (SIMD) --- The same instruction is executed by multiple processors using different data streams. SIMD computers exploit data-level parallelism by applying the same operations to multiple items of data in parallel.
+- _*Multiple instruction streams, single data stream*_ (MISD) --- No commercial multiprocessor of this type has been built to date, but it rounds out this simple classification.
+- _*Multiple instruction streams, multiple data streams*_ (MIMD) --- Each processor fetches its own instructions and operates on its own data, and it targets task-level parallelism. It exploits both data-level parallelism and task-level parallelism. MIMD computers are the most common *_multiprocessors_* in use today.
 
-As shown in the @fig:risc-v-registers, the width of these registers is defined by the RISC-V base variant used. For RV32, the registers are 32 bits wide; for RV64, they are 64 bits wide; and for RV128, the registers are 128 bits wide.
+#muchpdf(read("figures/parallelism.pdf", encoding: none))
 
-#figure(
-  image("figures/risc-v-registers.jpg", width: 80%),
-  caption: [ RISC-V Registers @RegistersRISCVWikiChip],
-) <fig:risc-v-registers>
+#pagebreak()
 
 == Five classic components of a computer
 The five classic components are shown in the @fig:five-classic-components. The five components perform the tasks of *inputting, outputting, processing and storing data*.
@@ -115,10 +116,75 @@ $
   "CPU time" = "Instruction count" times "CPI" / "Clock rate"
 $
 
+== The Basics of the RISC V Instruction Set
+All RISC architectures(*RISC V, MIPS, ARM*) are characterized by a few key properties:
+1. *All operations on data apply to data in registers* and typically change the entire register(32 or 64 bits).
+2. The only operations that affect memory are *load* and *store* operations that move data from memory to a register or to memory from a register, respectively.
+3. The instruction formats are few in number, with all instructions typically being one size. In RISC V, the register specifiers: *rs1*, *rs2*, and *rd* are always in the same place simplifying the control.
+
+Several common types of instructions in RISC-V:
+- ALU instructions:
+  - *Sum* between two *registers* (Read from *rs1* and *rs2*, Write to *rd*): ```asm
+    add rd, rs1, rs2     # $rd <- $rs1 + $rs2
+    ```
+  - *Sum* between *register* and *constant* (Read from *rs1*, Write to *rd*): ```asm
+    addi rd, rs1, imm    # $rd <- $rs1 + imm
+    ```
+- Load/Store instructions:
+  - *Load* (Read from memory, Write to *rd*): ```asm
+    ld rd, offset (rs1)  # $rd <- Memory[$rs1 + offset]
+    ```
+  From the *rs1* register, calculate the index on the memory with the *offset*, take the value and store it in the *rd* register.
+  - *Store* (Read from *rs2*, Write to memory): ```asm
+    sd rs2, offset (rs1) # Memory[$rs1 + offset] <- $rs2
+    ```
+  Take the value from the *rs2* register and store it in the memory at the index calculated from the *rs1* register and the *offset*.
+- Branch instructions to control the instruction flow:
+  - *Conditional branches*:the branch is taken only if the condition is true.
+  Only if the condition is true (branch on equal):
+  ```asm
+  beq rs1, rs2, L1 # go to L1 if (rs1 == rs2)
+  ```
+  Only if the condition is false (branch on not equal):
+  ```asm
+  bne rs1, rs2, L1 # go to L1 if (rs1 != rs2)
+  ```
+  - *Unconditional branches*: the branch is always taken.
+  ```asm
+  j L1              # go to L1
+  jr ra             # go to add. contained in ra
+  ```
+
+#pagebreak()
+
+= Instruction-Level Parallelism
+There are two largely separable approaches to exploiting ILP:
+- An approach that relies on hardware to help discover and exploit the parallelism dynamically
+- An approach that relies on software technology to find parallelism statically at *compile time*.
+
+== Dependences and Hazards
+There are three different types of dependences: _data dependences_ (also called true data dependences), _name dependences_, and _control dependences_.
+
+=== (True) Data Dependences
+An instruction $j$ is data-dependent on instruction $i$ if either of the following holds:
+- Instruction $i$ produces a result that may be used by instruction $j$.
+- Instruction $j$ is *data-dependent* on instruction $k$, and instruction $k$ is data-dependent on instruction $i$.
+The second condition simply states that one instruction is dependent on another if there exists a chain of dependences of the first type between the two instructions. This dependence chain can be as long as the entire program. Note that a dependence within a single instruction (such as `add x1, x2, x3`)
+
+A data dependence conveys three things:
++ the possibility of a *hazard*
++ the order in which results must be calculated
++ an upper bound on *how much parallelism* can possibly be exploited.
+
+=== Name Dependences
+A _*name dependence*_ occurs when two instructions use the same register or memory location, called a name, but there is no flow of data between the instructions associated with that name. There are two types of name dependences between an instruction $i$ that precedes instruction $j$ in program order:
++ An _*antidependence*_ between instruction $i$ and instruction $j$ occurs when instruction $j$ writes a register or memory location that instruction $i$ reads. *(Write After Read, WAR)*
++ An _*output dependence*_ when instruction $i$ and instruction $j$ write the same register or memory location. The ordering between the instructions must be preserved to ensure that the value finally written corresponds to instruction $j$.
+
 #pagebreak()
 
 = Pipelining
-*Pipelining* is an implementation technique whereby multiple instructions are *overlapped* in execution; it takes advantage of *parallelism* that exists among the actions needed to execute an instruction.
+*Pipelining* is an implementation technique whereby multiple instructions are *overlapped* in execution; it takes advantage of *instruction-level parallelism* that exists among the actions needed to execute an instruction.
 
 A pipeline is like an *assembly line*. In a computer pipeline, each step in the pipeline completes a part of an instruction. Like the assembly line, different steps are completing different parts of different instructions in parallel. Each of these steps is called a _pipe stage_ or a _pipe segment_.
 
@@ -126,59 +192,37 @@ The _*throughput*_ of an instruction pipeline is determined by how often an inst
 
 Pipelining yields a reduction in the average execution time per instruction. If the starting point is a processor that takes multiple clock cycles per instruction, then pipelining reduces the CPI. Pipelining is an implementation technique that exploits *parallelism* among the instructions in a sequential instruction stream.
 
-== The Basics of the RISC V Instruction Set
-All RISC architectures(*RISC V, MIPS, ARM*) are characterized by a few key properties:
-1. *All operations on data apply to data in registers* and typically change the entire register(32 or 64 bits).
-2. The only operations that affect memory are *load* and *store* operations that move data from memory to a register or to memory from a register, respectively.
-3. The instruction formats are few in number, with all instructions typically being one size. In RISC V, the register specifiers: *rs1*, *rs2*, and *rd* are always in the same place simplifying the control.
+In a pipelined processor, *_Instruction Memory (IM), Data Memory (DM), and the Register File (RF)_* are critical components that interact with different pipeline stages to enable parallel instruction execution.
++ The *Instruction Memory* Stores the program instructions, and is accessed in the *Instruction Fetch (`IF`)* stage of the pipeline.
++ The *Data Memory* Stores runtime data (variables, arrays, etc.) and is accessed in the *Memory Access (`MEM`)* stage of the pipeline.
++ The *Register File* Holds the CPU's registers (e.g., 32 registers in RISC-V). In `ID` stage, it reads the source registers specified by the instruction, and in `WB` stage, it writes back results to the destination register.
 
-#example("RISC-V Instruction Set")[
-  Several common types of instructions in RISC-V:
-  - ALU instructions:
-    - *Sum* between two *registers*:
-    ```asm
-    add rd, rs1, rs2     # $rd <- $rs1 + $rs2
-    ```
-    - *Sum* between *register* and *constant*:
-    ```asm
-    addi rd, rs1, imm    # $rd <- $rs1 + imm
-    ```
-  - Load/Store instructions:
-    - *Load*:
-    ```asm
-    ld rd, offset (rs1)  # $rd <- Memory[$rs1 + offset]
-    ```
-    From the *rs1* register, calculate the index on the memory with the *offset*, take the value and store it in the *rd* register.
-    - *Store*:
-    ```asm
-    sd rs2, offset (rs1) # Memory[$rs1 + offset] <- $rs2
-    ```
-    Take the value from the *rs2* register and store it in the memory at the index calculated from the *rs1* register and the *offset*.
-  - Branch instructions to control the instruction flow:
-    - *Conditional branches*:the branch is taken only if the condition is true.
-    Only if the condition is true (branch on equal):
-    ```asm
-    beq rs1, rs2, L1 # go to L1 if (rs1 == rs2)
-    ```
-    Only if the condition is false (branch on not equal):
-    ```asm
-    bne rs1, rs2, L1 # go to L1 if (rs1 != rs2)
-    ```
-    - *Unconditional branches*: the branch is always taken.
-    ```asm
-    j L1              # go to L1
-    jr ra             # go to add. contained in ra
-    ```
-]
+#pagebreak()
 
-
-== A Simple Implementation of a RISC Instruction Set
+== Five Stage Implementation of a RISC Instruction Set
 Every instruction in this RISC subset can be implemented in, at most, *5 clock cycles*. The 5 clock cycles are as follows.
-+ _Instruction Fetch(IF)_: Send the program counter (PC) to memory and fetch the current instruction from memory. Update the PC to the next *sequential instruction* by adding 4 (because each instruction is 4 bytes) to the PC.
-+ _Instruction decode/register fetch cycle (ID)_: Decode the instruction and read the registers corresponding to register source specifiers from the register file. Do the equality test on the registers as they are read, for a possible branch. Sign-extend the offset field of the instruction in case it is needed. Compute the possible branch target address by adding the sign-extended offset to the incremented PC.
-+ _Execution/effective address cycle (EX)_: The ALU operates on the operands prepared in the prior cycle, performing one of three functions, depending on the instruction type.
-+ _Memory access (MEM)_: If the instruction is a *load*, the memory does a read using the effective address computed in the previous cycle. If it is a *store*, then the memory writes the data from the second register read from the register file using the effective address.
-+ _Write-back cycle (WB)_: Write the result into the *register file*, whether it comes from the memory system (for a load) or from the ALU (for an ALU instruction).
+
+=== Instruction Fetch (IF)
+Send the *program counter* (PC) to memory and fetch the current instruction from *_Instruction Memory_*. Update the PC to the next *sequential instruction* by adding 4 (because each instruction is 4 bytes) to the PC.
+
+
+=== Instruction Decode/Register Fetch (ID)
+Decode the instruction and read the registers corresponding to register source specifiers from the *register file*. Do the equality test on the registers as they are read, for a possible branch. Sign-extend the offset field of the instruction in case it is needed. Compute the possible branch target address by adding the sign-extended offset to the incremented PC.
+
+=== Execution/effective address cycle (EX)
+The *ALU* operates on the operands prepared in the prior cycle, performing one of three functions, depending on the instruction type.
+- _Memory reference_ --- The ALU adds the base register and the *offset* to form the effective address.
+- _Register-Register ALU instruction_ --- The ALU performs the specified operation on the two source registers.
+- _Register-Immediate ALU instruction_ --- The ALU performs the specified operation on the source register and the immediate value.
+- _Conditional branch_ --- Determine whether the condition is true.
+
+=== Memory access (MEM)
+If the instruction is a *load*, the memory does a read using the effective address computed in the previous cycle. If it is a *store*, then the memory writes the data from the second register read from the register file using the effective address.
+
+=== Write-back cycle (WB)
+Write the result into the *register file*, whether it comes from the memory system (for a load) or from the ALU (for an ALU instruction).
+
+#pagebreak()
 
 == Implementation of RISC-V processor
 The *Instruction Memory*(read-only memory) is separated from *Data Memory*. 32 General-Purpose Registers organized in a *Register File(RF)* with 2 read ports and 1 write port.
@@ -187,7 +231,7 @@ For every instruction, the first two steps are identical:
 + Send the *_program counter (PC)_* to the memory that contains the code and fetch the instruction from that memory.
 + *Read one or two registers*, using fields of the instruction to select the registers to read. For the `ld` instruction, we need to read only one register, but most other instructions require reading two registers.
 
-Fortunately,for each of the three instruction classes(memory-reference,arithmetic-logical, and branches), the actions are largely the same, independent of the exact instruction:
+Fortunately, for each of the three instruction classes(memory-reference,arithmetic-logical, and branches), the actions are largely the same, independent of the exact instruction:
 
 For example, all instruction classes use the *arithmetic-logical unit* (ALU) after reading the registers.
 - For the *memory-reference* instructions, the ALU computes the effective address by adding the offset to the base register.
@@ -196,7 +240,7 @@ For example, all instruction classes use the *arithmetic-logical unit* (ALU) aft
 
 #figure(
   image("figures/basic-implementation-risc-datapath.jpg", width: 80%),
-  caption: "Basic Implementation of a RISC Instruction Set",
+  caption: "Basic Implementation of a RISC-V data path",
 )
 
 #figure(
@@ -204,22 +248,7 @@ For example, all instruction classes use the *arithmetic-logical unit* (ALU) aft
   caption: "A complete implementation of RISC-V data path",
 )
 
-== Building a data path
-looking at which *datapath elements* each instruction needs, and then work our way down through the levels of abstraction.
-
-@fig:first-datapath-component shows the first element we need: a memory unit to store the instructions of a program and *supply instructions* given an address.
-- *Program Counter (PC)* is a register that holds the address of the current instruction.
-- *Adder* is used to increment the PC by 4 to get the address of the next instruction and it is permanently made an adder and cannot perform the other ALU functions.
-- The *instruction memory* need only provide read access because the datapath does not write instructions.
-
-#figure(
-  image("figures/first-datapath-component.jpg", width: 80%),
-  caption: [First datapath component: Instruction Memory],
-) <fig:first-datapath-component>
-
-== RISC-V Pipelining
-Pipelining is a performance optimization technique based on the *overlap* of the execution of multiple instructions deriving from a sequential execution flow. Pipelining exploits *instruction parallelism* in a sequential instruction stream.
-
+== Five-Stage Pipeline
 Sequential is slower than pipeline. The following figure shows the difference (in terms of clock cycles) between sequential and pipeline.
 
 #figure(
@@ -229,7 +258,7 @@ Sequential is slower than pipeline. The following figure shows the difference (i
 
 The time to advance the instruction of one stage in the pipeline corresponds to a *clock cycle*. The total cost is: 9 clock cycles.
 
-The pipeline stages must be synchronized, the duration of a clock cycle is defined by the time requested by the *slower stage* of the pipeline. The goal is to balance the length of each pipeline stage. If the stages are perfectly balanced, the *ideal speedup* due to pipelining is equal to the number of pipeline stages.
+The pipeline stages must be *synchronized*, the duration of a clock cycle is defined by the time requested by the *slower stage* of the pipeline. The goal is to balance the length of each pipeline stage. If the stages are perfectly balanced, the *ideal speedup* due to pipelining is equal to the number of pipeline stages.
 
 The sequential and pipelining cases consist of 5 instructions, each of which is divided into 5 low-level instructions of 2 ns each.
 - The *latency* (total execution time) of each instruction is not varied, it's always 10 ns.
@@ -250,21 +279,46 @@ beq $x , $y , offset
   caption: [ Pipeline Execution of RISC-V Instructions ],
 )
 
-== Resources used during the pipeline execution
-*IM* is Instruction Memory, *REG* is Register File and *DM* is Data Memory.
+Resources used during the pipeline execution
+*IM* is Instruction Memory, *REG* is Register File and *DM* is Data Memory:
 
 #figure(
   image("figures/resource_used_pipeline.jpg", width: 80%),
   caption: [Resources used during the pipeline execution ],
 )
 
-== Performance Metrics
-IC = Instruction Count, CPI = Clocks Per Instruction, IPC = Instructions Per Clock Cycle = 1 / CPI, MIPS = $f_("clock") slash ("CPI" times 10^6)$.
+#pagebreak()
 
-*Clock Cycles = IC + Stall Cycles + 4*. 4 is clocks to conclude the pipeline.
+== Pipeline Performance Metrics
+=== Clocks Per Instruction (CPI)
+For pipelined processors, CPI is significantly affected by pipeline characteristics:
+- *Ideal Pipeline CPI*: In a perfect $k$-stage pipeline with no hazards: $ "CPI"_"ideal" = 1 $
+- *Actual Pipeline CPI*: In real pipelines, CPI includes stall cycles due to hazards: $ "Ave. CPI"_"pipeline" = "CPI"_"ideal" + "Structural stalls" + "Data hazard stalls" + "Control stalls" $
+
+
+=== Instruction Per Clock Cycle (IPC)
+*IPC* measures the instruction throughput of the pipeline:
+$ "IPC" = "Instructions executed" / "Clock cycles" = 1 / "CPI" $
+
+=== Pipeline Clock Cycles Calculation
+The total number of clock cycles for a pipelined program:
+$
+  "Total Clock Cycles" = "IC" + "Pipeline depth" - 1 + "Stall cycles"
+$
+
+=== MIPS in Pipelined Processors
+For pipelined processors, MIPS calculation considers the effective CPI:
+$
+  "MIPS"_"pipeline" = f_"clock" / ("CPI"_"pipeline" times 10^6)
+$
+
+*Peak MIPS* (theoretical maximum with no stalls):
+$
+  "MIPS"_"peak" = f_"clock" / (1 times 10^6) = f_"clock" / 10^6
+$
 
 #example("Speedup of Pipeline")[
-  Consider the unpipelined processor in the previous section. Assume that it has a *4 GHz* clock (or a 0.5 ns clock cycle) and that it uses *four cycles* for ALU oper-ations and branches and *five cycles* for memory operations.
+  Consider the unpipelined processor in the previous section. Assume that it has a *4 GHz* clock (or a 0.5 ns clock cycle) and that it uses *four cycles* for ALU operations and branches and *five cycles* for memory operations.
 
   Assume that the relative frequencies of these operations are 40%, 20%, and 40%, respectively.
 
@@ -286,16 +340,17 @@ IC = Instruction Count, CPI = Clocks Per Instruction, IPC = Instructions Per Clo
   $
 ]
 
+#pagebreak()
+
 == Pipeline Hazards
-There are situations, called *_hazards_*, that prevent the next instruction in the instruc-
-tion stream from executing during its designated clock cycle. Hazards reduce the performance from the ideal speedup gained by pipelining. There are *three classes of hazards*.
+There are situations, called *_hazards_*, that prevent the next instruction in the instruction stream from executing during its designated clock cycle. Hazards reduce the performance from the ideal speedup gained by pipelining. There are *three classes of hazards*.
 
 === Structural Hazards
-*Structural hazards* occur when we attempt to use the same resource from different instructions simutaneously.
+*Structural hazards* occur when we attempt to use the same resource from different instructions simultaneously.
 
 The RISC-V architecture avoids *structural hazards* by two key design decisions:
 + *Separate Instruction and Data Memories (_Harvard-Style Architecture_)*: The *fetch stage (IF)* of the pipeline accesses the *Instruction Memory* to read the next instruction. The *memory stage (MEM)* of the pipeline accesses the *Data Memory* to read/write operands. Since the *IM* and *DM* are separate, fetching an instruction and accessing data can happen in parallel without resource competition.
-+ *Multiple-Ported Register File Design*: Read ports allow instructions in the decode stage (ID) to read operands. Write ports allow instructions in the write-back stage (WB) to update registers. #firebrick[Register file read/write operations can occur in the same clock cycle without conflict.]
++ *Multiple-Ported Register File Design*: Read ports allow instructions in the decode stage (`ID`) to read operands. Write ports allow instructions in the write-back stage (WB) to update registers. #firebrick[Register file read/write operations can occur in the same clock cycle without conflict.]
 
 === Data Hazards
 If the instructions executed in the pipeline are *dependent to each other*, data hazards can arise when instructions are too close. There are three types of data hazards:
@@ -1100,7 +1155,7 @@ The processor address is cleverly divided into three parts:
 
 For *Direct Mapped Cache*, each memory location corresponds to one and only one cache location. The cache address of the block is given by:
 $
-  "(Block Address)cache = (Block Address)mem mod (Num. of Cache Blocks)"
+  "(Block Address) cache = (Block Address)mem mod (Num. of Cache Blocks)"
 $
 
 #figure(
@@ -1121,7 +1176,7 @@ For *n-way set associative cache*, Cache composed of sets, each set composed of 
 
 == Cache Replacement
 When a cache miss occurs, the cache must decide which block to replace. The replacement policy is crucial for cache performance. Common policies include:
-- *Random*: To spread allocation uniformly, candidate blocks are randomly selected.
+- *_Random_*: To spread allocation uniformly, candidate blocks are randomly selected.
 - *_Least recently used (LRU)_*: The block that has not been used for the longest time is replaced.
 - _*First in, first out (FIFO)*_: Because LRU can be complicated to calculate, this approximates LRU by determining the oldest block rather than the LRU.
 
@@ -1249,7 +1304,7 @@ $
   "AMAT"_("harvard") =& \%"Instr". ("Hit Time" + "Miss Rate" I\$ \* "Miss Penalty") \
   +& \%"Data" ("Hit Time" + "Miss Rate" D\$ \* "Miss Penalty")
 $
-Usually: Miss Rate I\$ << Miss Rate D\$
+Usually: Miss Rate I $<<$ Miss Rate D
 
 === Local and global miss rates
 #definition("Local miss rate")[
