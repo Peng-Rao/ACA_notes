@@ -382,7 +382,7 @@ $)
 ]
 
 #figure(
-  image("figures/data-hazards-example.jpg", width: 80%),
+  image("figures/data-hazards-example.jpg", width: 60%),
   caption: "Data Hazards Example",
 ) <fig:data-hazards-example>
 
@@ -420,7 +420,7 @@ The problem posed in @fig:data-hazards-example can be solved with a simple hardw
   caption: "Forwarding in a Pipeline",
 )
 
-==== Forwarding
+=== Forwarding
 
 If we can take the inputs to the ALU from _any_ pipeline register rather than just `ID/EX`, then we can forward the correct data. By adding multiplexers to the input of the ALU, and with the proper controls, we can run the pipeline at full speed in the presence of these data hazards.
 
@@ -439,7 +439,11 @@ There are three forwarding paths:
 The first path is between the ALU output of the `EX` stage and the ALU input of the `EX` stage. This path is used to forward the result of the `sub` instruction to the `and` instruction.
 
 ===== MEM/EX Path
-Required for load-use hazards, where the loaded value is only available after MEM.
+Required for load-use hazards, where the loaded value is only available after MEM. For example:
+```asm
+lw x1, 0(x2)
+add x3, x1, x4
+```
 
 ===== MEM/MEM Path
 typically for `load` and `store` instructions.
@@ -448,8 +452,6 @@ typically for `load` and `store` instructions.
   image("figures/forwarding-path.jpg", width: 80%),
   caption: "Forwarding Unit",
 )
-
-
 
 == Control Hazards
 @fig:branch-hazards-example shows a sequence of instructions and indicates when the branch would occur in this pipeline. The numbers of the left of the instruction are the addresses of the instructions.
@@ -480,7 +482,7 @@ One way to improve conditional branch performance is to *reduce the cost of the 
 *If the branch outcome will be taken*, it will be necessary to:
 + *Flush only one* instructions before writing its results
 + *Fetch next instruction* at the Branch Target Address
-It reduces the penalty of a branch to only one instruction if the branch is taken, namely, the one currently being fetched.
+It reduces the penalty of a branch to only one instruction if the branch is taken, namely, the one currently being fetched. (*Early evaluation of branch in the `ID` stage*).
 
 To flush instructions in the `IF` stage, we add a control line, called *IF.Flush*, that zeros the instruction field of the `IF/ID` pipeline register. Clearing the register transforms the fetched instruction into a `nop`, an instruction that has *no action and changes no state*.
 
@@ -591,9 +593,11 @@ The job of the compiler is to find a valid and useful instruction to be schedule
   If the branch is *taken (misprediction)*, the `or` instruction in the delay slot needs to be *flushed* or it must be OK to be executed also when the branch goes in the unexpected direction.
 ]
 
+#pagebreak()
+
 == Dynamic Branch Prediction
 The basic idea is to use the past branch behavior to predict at runtime the future branch behavior.
-- We use the hardware to dynamically predict the outcome of a branch.
+- We use the hardware to *_dynamically predict_* the outcome of a branch.
 - The prediction will depend on the runtime behavior of the branch.
 - The prediction will change at runtime if the branch changes its behavior during execution.
 
@@ -708,14 +712,6 @@ In general, the last branch executed is not the same instruction as the branch b
 #pagebreak()
 
 = Introduction to Instruction Level Parallelism
-This potential overlap among instructions is called _instruction-level parallelism (ILP)_, because the instructions can be evaluated in parallel.
-
-The value of the CPI (cycles per instruction) for a pipelined processor is the sum of the base CPI and all contributions from stalls:
-
-#nonum($
-  "Pipeline CPI" = "Ideal pipeline CPI" + "Structural stalls" + "Data hazard stalls" + "Control stalls"
-$)
-
 #attention[
   Remind that pipelining improves *instruction throughput*, but not the latency of the single instruction.
 ]
