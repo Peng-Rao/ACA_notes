@@ -131,11 +131,11 @@ Several common types of instructions in RISC-V:
     addi rd, rs1, imm    # $rd <- $rs1 + imm
     ```
 - Load/Store instructions:
-  - *Load* (Read from memory, Write to *rd*): ```asm
+  - *Load* (*Read* the value of `rs1` for address calculation, Write to *rd*): ```asm
     ld rd, offset (rs1)  # $rd <- Memory[$rs1 + offset]
     ```
   From the *rs1* register, calculate the index on the memory with the *offset*, take the value and store it in the *rd* register.
-  - *Store* (Read from *rs2*, Write to memory): ```asm
+  - *Store* (*Read* the value of `rs1` for address calculation and the value of `rs2` for writing): ```asm
     sd rs2, offset (rs1) # Memory[$rs1 + offset] <- $rs2
     ```
   Take the value from the *rs2* register and store it in the memory at the index calculated from the *rs1* register and the *offset*.
@@ -177,13 +177,91 @@ A data dependence conveys three things:
 + an upper bound on *how much parallelism* can possibly be exploited.
 
 === Name Dependences
-A _*name dependence*_ occurs when two instructions use the same register or memory location, called a name, but there is no flow of data between the instructions associated with that name. There are two types of name dependences between an instruction $i$ that precedes instruction $j$ in program order:
+A _*name dependence*_ occurs when two instructions use the same register or memory location, called a name, *but there is no flow of data* between the instructions associated with that name. There are two types of name dependences between an instruction $i$ that precedes instruction $j$ in program order:
 + An _*antidependence*_ between instruction $i$ and instruction $j$ occurs when instruction $j$ writes a register or memory location that instruction $i$ reads. *(Write After Read, WAR)*
-+ An _*output dependence*_ when instruction $i$ and instruction $j$ write the same register or memory location. The ordering between the instructions must be preserved to ensure that the value finally written corresponds to instruction $j$.
++ An _*output dependence*_ when instruction $i$ and instruction $j$ write the same register or memory location. The ordering between the instructions must be preserved to ensure that the value finally written corresponds to instruction $j$. *(Write After Write, WAW)*
+
+== Summary of Data Dependencies
+Data dependency does not directly determine the *number of pipeline stalls*, whether true hazards occur, and how to eliminate them; it depends on how the pipeline handles these dependencies. In other words, the architectural characteristics of the pipeline determine:
+- wether there is a hazard
+- If there is a hazard, how to eliminate it(hardware or compiler)
+- If it cannot be optimized, the pipeline needs to stop several times
+
+When the pipeline executes instructions, the dependency relationships between instructions may lead to the following three types of data hazards:
+- *RAW hazards* correspond to *true data dependencies*
+- *WAR hazards* correspond to *anti-dependencies*
+- *WAW hazards* correspond to *output dependencies*
+
+Dependencies are a property of the program, while hazards are a property of the pipeline architecture.
+
+A control dependence determines the ordering of instructions and it is preserved by two properties:
+- Instructions execution in program order to ensure that an instruction that occurs before a branch is executed before the branch.
+- Detection of control hazards to ensure that an instruction (that is control-dependent on a branch) is not executed until the branch direction is known.
+
+Although preserving control dependence is a simple way to preserve program order, control dependence is not the critical property that must be preserved(as seen when we've studied scheduling techniques to fill in the branch delay slot).
+
+Two properties are critical to preserve program correctness (and normally preserved by maintaining both data and control dependencies during scheduling):
+- *Data flow*: Actual flow of data values among instructions that produces the correct results and consumes them.
+- *Exception behavior*: Preserving exception behavior means that any changes in the ordering of instruction execution must not change how exceptions are raised in the program.
+
+== Register Renaming
+If the register used could be changed, then the instructions do not conflict anymore.
+
+#example("Register Renaming")[
+  ```asm
+  Ii: r3 <-  (r1)  op  (r2)
+  Ij: r1 <- (r4) op (r5) => r4 <- (r4) op (r5)
+
+  Ii: r3 <-  (r1)  op  (r2)
+  Ij: r3 <- (r6) op (r7) => r4 <- (r6) op (r7)
+  ```
+]
+Register renaming can be more easily done, if there are enough registers available in the ISA. Register Renaming can be done either statically by the compiler or dynamically by the hardware.
+
+
+
+== Multi-cycle Pipeline
+We consider *single-issue* processors (one instruction issued per clock cycle).
+- Instructions are then *issued in-order*.
+- *Execution stage* might require multiple cycles latency, depending on the operation type (i.e., multiply operations are typically longer than add/sub operations).
+- *Memory stages* might require multiple cycles access time due to instruction and data cache misses.
+
+=== Multi-cycle In-Order Pipeline
+#figure(
+  image("figures/multi-cycle-in-order-pipeline.jpg", width: 80%),
+  caption: "Multi-cycle In-Order Pipeline",
+)
+
+#figure(image("figures/multi-cycle-in-order-pipeline1.jpg", width: 80%))
+
+- *In-order issue* & *In-order commit* of instructions.
+- This avoids the generation of *WAR* & *WAW* hazards and preserves the *precise exception model*.
+
+=== Multi-cycle Out-of-Order Pipeline
+#figure(
+  image("figures/multi-cycle-out-of-order.jpg", width: 80%),
+  caption: "Multi-cycle Out-of-Order Pipeline",
+)
+- ID stage split in 2 stages: Instr. Decode (*ID*) & Register Read (*Issue*);
+- Multiple functional units with variable latency;
+- Long latency *multi-cycle floating-point instructions*;
+- Memory systems with variable access time: *Multi-cycle memory accesses* due to data cache misses (unpredictable statically);
+- *Out-of-order commit*: Need to check for WAR & WAW hazards and imprecise exception
+
+#figure(image("figures/multi-cycle-out-of-order1.jpg", width: 80%))
+- *In-order issue* of instructions
+- *Out-of-order execution & out-of-order commit* of instructions
+- Need to check the generation of *WAR & WAW hazards* and imprecise exceptions.
+
+=== Dynamic Scheduling
+*Problem*: Hazards due to true data dependencies that
+cannot be solved by forwarding cause stalls of the pipeline. No new instructions are fetched nor issued even if they are not data dependent
+\
+*Solution*: Allow data independent instructions behind a stall to proceed: Hardware manages dynamically the instruction execution to reduce stalls: an instruction execution begins as soon as their operands are available.
 
 #pagebreak()
 
-= Pipelining
+= Hardware Pipelining
 *Pipelining* is an implementation technique whereby multiple instructions are *overlapped* in execution; it takes advantage of *instruction-level parallelism* that exists among the actions needed to execute an instruction.
 
 A pipeline is like an *assembly line*. In a computer pipeline, each step in the pipeline completes a part of an instruction. Like the assembly line, different steps are completing different parts of different instructions in parallel. Each of these steps is called a _pipe stage_ or a _pipe segment_.
@@ -191,6 +269,10 @@ A pipeline is like an *assembly line*. In a computer pipeline, each step in the 
 The _*throughput*_ of an instruction pipeline is determined by how often an instruction exits the pipeline. The time required between moving an instruction one step down the pipeline is a *processor cycle*.
 
 Pipelining yields a reduction in the average execution time per instruction. If the starting point is a processor that takes multiple clock cycles per instruction, then pipelining reduces the CPI. Pipelining is an implementation technique that exploits *parallelism* among the instructions in a sequential instruction stream.
+
+#attention("throughput")[
+  Remind that pipelining improves *instruction throughput*, but not the latency of the single instruction.
+]
 
 In a pipelined processor, *_Instruction Memory (IM), Data Memory (DM), and the Register File (RF)_* are critical components that interact with different pipeline stages to enable parallel instruction execution.
 + The *Instruction Memory* Stores the program instructions, and is accessed in the *Instruction Fetch (`IF`)* stage of the pipeline.
@@ -689,6 +771,22 @@ Usually, it is combined with a *Branch Outcome Predictor* such as a 1-bit (or 2-
   caption: "Branch Target Buffer",
 )
 
+#example("Dynamic branch prediction of for loop")[
+  Let's consider the following `for loop`:
+  ```c
+  for (int i = 0; i < 10; i++) {
+    for (int j = 0; j < 5; j++) {
+      // do something
+    }
+  }
+  ```
+  #figure(
+    image("figures/dynamic-branch-prediction-for-loop.png", width: 80%),
+    caption: "Dynamic Branch Prediction of For Loop",
+  )
+  For the outer loop1, we have 9 mispredictions. For the inner loop2, we have 1 mispredictions. The total number of mispredictions is $9 + 1 times 10 = 19$.
+]
+
 === Correlating Branch Predictors
 The 2-bit BHT uses only the recent behavior of a single branch to predict the future behavior of that branch.
 
@@ -711,113 +809,44 @@ In general, the last branch executed is not the same instruction as the branch b
 
 #pagebreak()
 
-= Introduction to Instruction Level Parallelism
-#attention[
-  Remind that pipelining improves *instruction throughput*, but not the latency of the single instruction.
-]
+= Advanced Dynamic Scheduling Techniques
+A major *limitation* of simple pipelining techniques is that they use *in-order instruction issue and execution*: instructions are issued in program order, and if an instruction is stalled in the pipeline, no later instructions can proceed.
 
-== The problem of Dependencies
-Determining dependencies among instructions is critical to define the amount of parallelism existing in a program. If two instructions are *dependent* to each other, they cannot be executed in parallel, they must be executed in a sequential order or only partially overlapped.
+In the classic five-stage pipeline, both *structural and data hazards* could be checked during instruction decode (`ID`): when an instruction could execute without hazards, it was issued from `ID`, with the recognition that all data hazards had been resolved. Thus, if there is a dependence between two closely spaced instructions in the pipeline, it will lead to a hazard, and a stall will result. For example, consider this code:
+```asm
+fdiv.d f0,f2,f4
+fadd.d f10,f0,f8
+fsub.d f12,f8,f14
+```
+The `fsub.d` instruction cannot execute because the dependence of `fadd.d` on `fdiv.d` causes the pipeline to stall; yet, `fsub.d` is not data-dependent on anything in the pipeline. This hazard creates a performance limitation that can be eliminated by not requiring instructions to execute in program order.
 
-There are *three* different types of dependencies in a code:
-- *True Data Dependencies*: an instruction $j$ is dependent on a data produced by a previous instruction $i$
-- *Name Dependencies*: two instructions use the same register or memory location;
-- *Control Dependencies*: they impose the ordering of instructions
-
-== Name Dependencies
-A *name dependence* occurs when two instructions use the same register or memory location (called name), but there is no flow of data between the instructions associated with that name.
-
-#attention[
-  Name dependencies are *not true data dependencies*, since there is no value (no data flow) being transmitted between the two instructions => this is just a *register reuse*!
-]
-
-There are two types of name dependencies:
-- dependencies
-- Output dependencies
-
-Let's consider Ii that precedes instruction Ij in program order:
-+ *Anti-dependencies*: When *Ij* writes a register or memory location that instruction *Ii* read, it can generate a *Write After Read (WAR) hazard*.
-+ *Output dependencies*: When *Ij* writes a register or memory location that instruction *Ii* also writes, it can generate a *Write After Write (WAW) hazard*.
+Thus we still use in-order instruction issue (i.e., *instructions issued in program order*), but we want an instruction to begin execution as soon as its data operands are available. Such a pipeline does *out-of-order execution*, which implies out-of-order completion.
 
 == Register Renaming
-If the register used could be changed, then the instructions do not conflict anymore.
+*_Out-of-order execution_* introduces the possibility of *WAR* and *WAW* hazards, which do not exist in the five-stage integer pipeline and its logical extension to an in-order floating-point pipeline. Consider the following RISC-V floating-point code sequence:
+```asm
+fdiv.d f0,f2,f4      ; f0 ← f2 / f4
+fmul.d f6,f0,f8      ; f6 ← f0 * f8 (RAW)
+fadd.d f0,f10,f14    ; f0 ← f10 + f14 (WAW + WAR)
+```
+Both these hazards are avoided by the use of *_register renaming_*.
 
-#example("Register Renaming")[
-  ```asm
-  Ii: r3 <-  (r1)  op  (r2)
-  Ij: r1 <- (r4) op (r5) => r4 <- (r4) op (r5)
+== Exception Handling
+Out-of-order completion also creates major complications in *handling exceptions*. Dynamic scheduling with out-of-order completion must preserve exception behavior in the sense that exactly those exceptions that would arise if the program were executed in strict program order actually do arise. Dynamically scheduled processors preserve exception behavior by delaying the notification of an associated exception until the processor knows that the instruction should be the next one completed.
 
-  Ii: r3 <-  (r1)  op  (r2)
-  Ij: r3 <- (r6) op (r7) => r4 <- (r6) op (r7)
-  ```
-]
-Register renaming can be more easily done, if there are enough registers available in the ISA. Register Renaming can be done either statically by the compiler or dynamically by the hardware.
+Although exception behavior must be preserved, dynamically scheduled processors could generate _*imprecise exceptions*_. An exception is _imprecise_ if the processor state when an exception is raised does not look exactly as if the instructions were executed sequentially in strict program order. Imprecise exceptions can occur because of two possibilities:
++ The pipeline may have _already completed_ instructions that are later in program order than the instruction causing the exception.
++ The pipeline may have _not yet completed_ some instructions that are earlier in program order than the instruction causing the exception.
 
-== Summary of Data Dependencies
-Data dependency does not directly determine the *number of pipeline stalls*, whether true hazards occur, and how to eliminate them; it depends on how the pipeline handles these dependencies. In other words, the architectural characteristics of the pipeline determine:
-- wether there is a hazard
-- If there is a hazard, how to eliminate it(hardware or compiler)
-- If it cannot be optimized, the pipeline needs to stop several times
+Imprecise exceptions make it difficult to restart execution after an exception.
 
-When the pipeline executes instructions, the dependency relationships between instructions may lead to the following three types of data hazards:
-- *RAW hazards* correspond to *true data dependencies*
-- *WAR hazards* correspond to *anti-dependencies*
-- *WAW hazards* correspond to *output dependencies*
-
-Dependencies are a property of the program, while hazards are a property of the pipeline architecture.
-
-A control dependence determines the ordering of instructions and it is preserved by two properties:
-- Instructions execution in program order to ensure that an instruction that occurs before a branch is executed before the branch.
-- Detection of control hazards to ensure that an instruction (that is control-dependent on a branch) is not executed until the branch direction is known.
-
-Although preserving control dependence is a simple way to preserve program order, control dependence is not the critical property that must be preserved(as seen when we've studied scheduling techniques to fill in the branch delay slot).
-
-Two properties are critical to preserve program correctness (and normally preserved by maintaining both data and control dependencies during scheduling):
-- *Data flow*: Actual flow of data values among instructions that produces the correct results and consumes them.
-- *Exception behavior*: Preserving exception behavior means that any changes in the ordering of instruction execution must not change how exceptions are raised in the program.
-
-== Multi-cycle Pipeline
-We consider *single-issue* processors (one instruction issued per clock cycle).
-- Instructions are then *issued in-order*.
-- *Execution stage* might require multiple cycles latency, depending on the operation type (i.e., multiply operations are typically longer than add/sub operations).
-- *Memory stages* might require multiple cycles access time due to instruction and data cache misses.
-
-=== Multi-cycle In-Order Pipeline
-#figure(
-  image("figures/multi-cycle-in-order-pipeline.jpg", width: 80%),
-  caption: "Multi-cycle In-Order Pipeline",
-)
-
-#figure(image("figures/multi-cycle-in-order-pipeline1.jpg", width: 80%))
-
-- *In-order issue* & *In-order commit* of instructions.
-- This avoids the generation of *WAR* & *WAW* hazards and preserves the *precise exception model*.
-
-=== Multi-cycle Out-of-Order Pipeline
-#figure(
-  image("figures/multi-cycle-out-of-order.jpg", width: 80%),
-  caption: "Multi-cycle Out-of-Order Pipeline",
-)
-- ID stage split in 2 stages: Instr. Decode (*ID*) & Register Read (*Issue*);
-- Multiple functional units with variable latency;
-- Long latency *multi-cycle floating-point instructions*;
-- Memory systems with variable access time: *Multi-cycle memory accesses* due to data cache misses (unpredictable statically);
-- *Out-of-order commit*: Need to check for WAR & WAW hazards and imprecise exception
-
-#figure(image("figures/multi-cycle-out-of-order1.jpg", width: 80%))
-- *In-order issue* of instructions
-- *Out-of-order execution & out-of-order commit* of instructions
-- Need to check the generation of *WAR & WAW hazards* and imprecise exceptions.
-
-=== Dynamic Scheduling
-*Problem*: Hazards due to true data dependencies that
-cannot be solved by forwarding cause stalls of the pipeline. No new instructions are fetched nor issued even if they are not data dependent
-\
-*Solution*: Allow data independent instructions behind a stall to proceed: Hardware manages dynamically the instruction execution to reduce stalls: an instruction execution begins as soon as their operands are available.
+To allow out-of-order execution, we essentially split the ID pipe stage of our simple five-stage pipeline into two stages:
++ _Issue_ --- Decode instructions, check for structural hazards.
++ _Read operands_ --- Wait until no data hazards, then read operands.
+An *instruction fetch* (`IF`) stage precedes the *issue stage* and may fetch either to an instruction register or into a queue of pending instructions; instructions are then issued from the register or queue.
 
 #pagebreak()
 
-= Advanced Dynamic Scheduling Techniques
 == Scoreboard Dynamic Scheduling Technique
 === Scoreboard basic assumptions
 - We consider a *single-issue* processor.
@@ -827,6 +856,23 @@ cannot be solved by forwarding cause stalls of the pipeline. No new instructions
 - Execution stage might require *multiple cycles*, depending on the operation type and latency.
 - Memory stage might require *multiple cycles* access time due to data cache misses.
 - *Out-of-order execution & out-of-order commit*(this introduces the possibility of *WAR & WAW* hazards).
+
+=== Scoreboard Implications
+There are multiple instructions in execution phase. Multiple execution units or pipelined execution units. No register renaming, so the Scoreboard must track the status of each instruction and its operands to avoid hazards.
+
+==== Solutions for `WAR`
+- Read registers only during Read Operands stage.
+- Stall write back until previous registers have been read.
+
+==== Solution for `WAW`:
+- Detect `WAW` hazard and stall issue of new instruction until previous instruction causing `WAW` completes.
+
+=== Scoreboard Scheme
+Any hazard detection and resolution is _*centralized*_ in the Scoreboard:
+- Every instruction goes through the Scoreboard, where a record of data dependences is constructed.
+- The Scoreboard then determines when the instruction can read its operand and begin execution (check for `RAW`)
+- If the Scoreboard decides the instruction cannot execute immediately, it monitors every change and decides when the instruction can execute.
+- The scoreboard controls when the instruction can write its result into destination register (check for `WAR` & `WAW`).
 
 === Scoreboard Pipeline stages
 
@@ -849,7 +895,7 @@ A source operand is available if:
 
 When the source operands are available, the Scoreboard tells the FU to proceed to read the operands from the RF and begin execution.
 
-RAW hazards are solved dynamically in this step:
+`RAW` hazards are solved dynamically in this step:
 - out-of-order reading of operands
 - instructions are sent into execution out-of-order.
 
@@ -908,14 +954,33 @@ state of the functional unit:
   caption: "Register Result Status",
 )
 
+#pagebreak()
+
 == Tomasulo Dynamic Scheduling Technique
 _Tomasulo Algorithm_, invented by Robert Tomasulo, tracks when operands for instructions are available to minimize *RAW hazards* and introduces *register renaming* in hardware to minimize *WAW and WAR hazards*.
 
 Although there are many variations of this scheme in recent processors, they all rely on two key principles:
 - dynamically determining when an instruction is ready to execute.
-- renaming registers to avoid unnecessary hazards.
+
+To better understand how *_register renaming_* eliminates `WAR` and `WAW` hazards, consider the following example code sequence that includes potential `WAR` and `WAW` hazards:
+```asm
+fdiv.d f0,f2,f4
+fadd.d f6,f0,f8
+fsd f6,0(x1)
+fsub.d f8,f10,f14  // WAR f8
+fmul.d f6,f10,f8   // WAR f6, WAW f6
+```
+These three _name dependences_ can all be eliminated by *register renaming*. For simplicity, assume the existence of two temporary registers, `S` and `T`. Using `S` and `T`, the sequence can be rewritten without any dependences as
+```asm
+fdiv.d f0,f2,f4
+fadd.d S,f0,f8
+fsd S,0(x1)
+fsub.d T,f10,f14
+fmul.d f6,f10,T
+```
 
 === Reservation Station
+In Tomasulo's scheme, _register renaming_ is provided by _*reservation stations*_, which buffer the operands of instructions waiting to issue and are associated with the functional units.
 - *Busy*: Indicates reservation station is busy.
 - *Op*: Operation to perform in the unit.
 - *$V_j$, $V_k$*: Value of source operands.
@@ -928,10 +993,15 @@ Each entry in the RF and in the Store buffers have a Value ($V_i$) and a Pointer
 - If the pointer is zero means that the value is available in the register/buffer content (no active instruction is computing the result);
 
 === Load/Store Buffers
-Load/Store buffers have *Busy and Address field*. To hold info for memory address calculation for load/stores, the address field initially contains the instruction offset (immediate field); after address calculation, it stores the effective address.
+Load/Store buffers have *Busy and Address field*. To hold info for memory address calculation for load/stores, the address field initially contains the instruction offset (immediate field); after address calculation, it stores the effective address. *They behave almost like reservation stations*.
 
 === Stages of Tomasulo Algorithm
 ==== Issue
+- *Fetch instruction* from the instruction queue (FIFO), maintaining correct data flow.
+- Check for *structural hazards* (if no RS is available, the instruction stalls).
+- If the operand is in a register, obtain the value directly; If it is not ready, record the source of its producer.
+- Put the instruction with operands or operands source into a reservation station (RS) associated with the required functional unit (FU).
+
 Instructions are fetched from the head of a *FIFO queue*, ensuring they are issued in program order. This maintains in-order issue even if execution is out-of-order.
 
 Each instruction requires an available RS. If none are free, the instruction stalls, preventing structural hazards due to limited hardware resources.
@@ -968,14 +1038,21 @@ Each instruction requires an available RS. If none are free, the instruction sta
 ==== Write result
 When result is available, write it on Common Data Bus and from there into Register File and into all RSs (including store buffers) waiting for this result; Stores also write data to memory unit during this stage (when memory address and result data are available); Mark reservation station available.
 
-=== Reorder Buffer
+#pagebreak()
+
+== Hardware-Based Speculation
 We introduce the concept of HW-based speculation, which extends the ideas of dynamic scheduling beyond branches.
 
 HW-based speculation combines *3 key concepts*:
 + *Dynamic branch prediction*;
 + *Speculation* to enable the execution of instructions before the branches are solved by undoing the effects of mispredictions;
 + *Dynamic scheduling* beyond branches.
+#figure(
+  image("figures/ROB-structure.jpg", width: 80%),
+  caption: "The basic structure of a FP unit using Tomasulo's algorithm and extended to handle speculation",
+)
 
+=== Reorder Buffer
 To support *HW-based speculation*, we need to enable the execution of instructions *before* the control dependencies are solved. In case of mispredictions, we need to undo the effects of an incorrectly speculated sequence of instructions.
 
 Therefore, we need to separate the process of execution completion from the commit of the instruction result in the RF or in memory.
@@ -990,7 +1067,12 @@ Use *ReOrder Buffer numbers* instead of reservation station numbers as pointers 
 
 === Speculative Tomasulo
 ==== Issue
-Get instruction from instr. queue, if there are one RS entry free and one ROB entry free, then instr. Issued:
++ *Get instruction* from instruction queue
++ Check if there is an available RS and ROB entry. If either RS or ROB is full, the instruction *stalls*.
++ *Resource Allocation*.
+  - For RS: Mark the selected RS as occupied, and load the instruction opcode and operands information.
+  - For ROB: Allocate a free entry, and generate a unique ROB ID (e.g., `ROB#5`). Record instruction info (destination register, status, etc.).
++ *Operand Fetch*: ROB Entry is high priority, which contains the least uncommit result.
 
 If its operands available in RF or in ROB, they are sent to RS; Number of ROB entry allocated for result is sent to RSs (to tag the result when it will be placed on the CDB). *If RS full or/and ROB full: instruction stalls.*
 
@@ -1058,7 +1140,6 @@ A *dependence graph* captures true, anti and output dependencies between instruc
   caption: "Dependence Graph",
 )
 
-== Loop Unrolling
 == Software Pipelining
 
 #pagebreak()
@@ -1200,6 +1281,73 @@ These are cache allocation policies that determine what happens when a write mis
   - *Fully Associative Cache*: The block size is 256 words, so the offset is 8 bits ($256 = 2^8$). The number of cache blocks is 4096, so the index is 0 bits. The tag is 30 - 8 = 22 bits.
   - *2-way Set-Associative Cache*: The number of sets is $4096 / 2=2048$, so the index is 11 bits ($2048 = 2^11$). The block size is 256 words, so the offset is 8 bits ($256 = 2^8$). The tag is 30 - 11 - 8 = 11 bits.
 ]
+
+#pagebreak()
+
+= Loop Unrolling
+To keep a pipeline full, parallelism among instructions must be exploited by finding sequences of unrelated instructions that can be overlapped in the pipeline. Consider a simple loop:
+```c
+for (i=999; i>=0; i=i-1)
+  x[i] = x[i] + s;
+```
+We can see that this loop is parallel by noticing that the body of each iteration is *independent*. The straightforward RISC-V code, not scheduled for the pipeline, looks like this:
+```asm
+Loop: fld f0,0(x1)    //f0=array element
+      fadd.d f4,f0,f2 //add scalar in f2
+      fsd f4,0(x1)    //store result
+      addi x1,x1,-8   //decrement pointer
+      bne x1,x2,Loop  //branch x1 not equal x2
+```
+
+A simple scheme for increasing the number of instructions relative to the branch and overhead instructions is _loop unrolling_. Unrolling simply replicates the loop body multiple times, adjusting the loop termination code.
+
++ Determine that unrolling the loop would be useful by finding that the loop iterations were *independent*, except for the loop maintenance code.
++ Use different registers to avoid unnecessary constraints that would be forced by using the same registers for different computations (e.g., name dependences).
++ Eliminate the extra test and branch instructions and adjust the loop termination and iteration code.
++ Determine that the loads and stores in the unrolled loop can be interchanged by observing that the loads and stores from different iterations are independent. This transformation requires analyzing the memory addresses and finding that they do not refer to the same address.
++ Schedule the code, preserving any dependences needed to yield the same result as the original code.
+
+*Pros*:
+- *Loop overhead* (number of counter increments and branches per loop) is minimized.
+- Loop unrolling extends the length of the basic block, the loop exposes more instructions that can be effectively scheduled to minimize `NOP` insertions.
+\
+*Cons*:
+- Loop unrolling increases the *register pressure* (number of allocated registers) due to the need of register renaming to avoid name dependencies.
+- Loop unrolling increases the *code size and instruction cache misses*.
+
+*Loop-level analysis* involves determining what data dependences exist among the operands across the iterations of a loop.
+
+*Loop-carried dependence*: Whether data accesses in later iterations are dependent on data values produced in earlier iterations.
+
+#pagebreak()
+
+= software pipelining
+
+#pagebreak()
+
+= Multithreading
+_*Multithreading*_ allows multiple threads to share the functional units of a single processor in an overlapping fashion. In contrast, a more general method to exploit _*thread-level parallelism (TLP)*_ is with a multiprocessor that has multiple independent threads operating at once and in parallel. Multithreading, however, does not duplicate the entire processor as a multiprocessor does. Instead, multithreading shares most of the processor core among a set of threads, duplicating only private state, such as the registers and program counter.
+
+There are three main hardware approaches to multithreading: _fine-grained_, _coarse-grained_, and _simultaneous_.
+
+== Fine-grained Multithreading
+Fine-grained MT switches between threads on each instruction, execution of multiple thread is interleaved in a round-robin fashion, skipping any thread that is stalled at time eliminating fully empty slots.
+- The processor must be able to switch threads on every cycle.
+- It can *hide both short and long stalls*, since instructions from other threads are executed when one thread stalls.
+- It slows down the execution of individual threads, since a thread that is ready to execute without stalls will be delayed by another threads.
+- Within each clock, ILP limitations still lead to empty issue slots
+
+== Coarse-grained Multithreading
+Coarse-grained multithreading was invented as an alternative to fine-grained multithreading. Coarse-grained multithreading switches threads only on costly stalls, such as level two or three cache misses. This reduces the number of idle cycles, but:
+- Within each clock, ILP limitations still lead to empty issue slots.
+- When there is one stall, it is necessary to empty the pipeline before starting the new thread;
+- The new thread has a pipeline start-up period with some idle cycles remaining and loss of throughput
+- Because of this *start-up overhead*, coarse-grained MT is better for reducing penalty of high-cost stalls, where pipeline refill << stall time
+
+== Simultaneous Multithreading (SMT)
+The most common implementation of multithreading is called _*simultaneous multithreading (SMT)*_. Simultaneous multithreading is a variation on fine-grained multithreading that arises naturally when fine-grained multithreading is implemented on top of a *multiple-issue*, *dynamically scheduled processor*.
+
+As with other forms of multithreading, SMT uses thread-level parallelism to hide long-latency events in a processor, thereby increasing the usage of the functional units. The key insight in SMT is that register renaming and dynamic scheduling allow multiple instructions from independent threads to be executed without regard to the dependences among them; the resolution of the dependences can be handled by the *dynamic scheduling capability*.
 
 #pagebreak()
 
@@ -1696,6 +1844,33 @@ When a directory block B0 in home N0 is in the *M state*, the current value of t
     table.header[Block][Coherence State][Sharer / Owner Bits],
     [B0], [Modified], [0 0 1 0],
   )
+
+#pagebreak()
+
+= Data Parallelism
+SIMD architectures can exploit significant data-level parallelism for:
+- Matrix-oriented scientific computing, machine learning and deep learning;
+- Multimedia such as image and sound processors;
+SIMD allows programmer to continue to think sequentially and achieve parallel speedups (compared to MIMD that require parallel programming).
+
+== Vector Architectures
+Vector architectures grab sets of data elements scattered about memory, place them into _*large sequential register files*_, operate on data in those register files, and then disperse the results back into memory. A single instruction works on vectors of data, which results in dozens of register-register operations on independent data elements.
+
+=== Components of Vector Architectures
+
+=== Execution of Vector Instructions
+We can best understand a vector processor by looking at a vector loop for RV64V. Let's take a typical vector problem, which we use throughout this section:
+$
+  Y = a times X + Y
+$
+X and Y are vectors, initially resident in memory, and a is a scalar. This problem is the SAXPY or DAXPY loop. (SAXPY stands for *single-precision* $a times X plus Y$, and DAXPY for *double precision* $a times X plus Y$.)
+
+=== Vector Execution Time
+Execution time depends on three factors:
+- Length of the operand vectors
+- Structure hazards
+- Data dependences
+Functional units consume one element per clock cycle, so the execution time is approximately given by the vector length.
 
 #pagebreak()
 
