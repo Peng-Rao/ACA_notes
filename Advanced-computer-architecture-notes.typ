@@ -158,12 +158,19 @@ Several common types of instructions in RISC-V:
 #pagebreak()
 
 = Instruction-Level Parallelism
+_*Instruction-Level Parallelism (ILP)*_ is a key concept in computer architecture that aims to improve the performance of uniprocessor by executing multiple instructions simultaneously or overlapping their execution.
+
 There are two largely separable approaches to exploiting ILP:
 - An approach that relies on hardware to help discover and exploit the parallelism dynamically
 - An approach that relies on software technology to find parallelism statically at *compile time*.
 
 == Dependences and Hazards
 There are three different types of dependences: _data dependences_ (also called true data dependences), _name dependences_, and _control dependences_.
+
+#figure(
+  image("figures/Big-picture-dependences-hazards.png", width: 100%),
+  caption: "Big picture of dependences and hazards",
+)
 
 === (True) Data Dependences
 An instruction $j$ is data-dependent on instruction $i$ if either of the following holds:
@@ -203,6 +210,11 @@ Although preserving control dependence is a simple way to preserve program order
 Two properties are critical to preserve program correctness (and normally preserved by maintaining both data and control dependencies during scheduling):
 - *Data flow*: Actual flow of data values among instructions that produces the correct results and consumes them.
 - *Exception behavior*: Preserving exception behavior means that any changes in the ordering of instruction execution must not change how exceptions are raised in the program.
+
+#tip("The difference between dependences and hazards")[
+  - *Dependences* are a property of the program, and they are determined by the data flow of the program.
+  - *Hazards* are a property of the pipeline architecture, and they are determined by the pipeline structure and how it handles hazards (`stall`, `forwarding`).
+]
 
 == Register Renaming
 If the register used could be changed, then the instructions do not conflict anymore.
@@ -1325,6 +1337,13 @@ A simple scheme for increasing the number of instructions relative to the branch
 
 #pagebreak()
 
+= Thread-Level Parallelism (TLP)
+_*Thread-level parallelism (TLP)*_ is a form of parallelism that allows multiple threads to be executed simultaneously, either on a single processor or across multiple processors. TLP can be exploited in various ways, including through multithreading and multiprocessor systems.
+- *Multithreading:* Exploiting Thread-Level Parallelism to Improve Uniprocessor Throughput
+- *Multiprocessor:* Multiple independent threads operating at once and in parallel
+
+#pagebreak()
+
 = Multithreading
 _*Multithreading*_ allows multiple threads to share the functional units of a single processor in an overlapping fashion. In contrast, a more general method to exploit _*thread-level parallelism (TLP)*_ is with a multiprocessor that has multiple independent threads operating at once and in parallel. Multithreading, however, does not duplicate the entire processor as a multiprocessor does. Instead, multithreading shares most of the processor core among a set of threads, duplicating only private state, such as the registers and program counter.
 
@@ -1464,7 +1483,13 @@ Usually: Miss Rate I $<<$ Miss Rate D
 #pagebreak()
 
 = Multiprocessors
-Multiprocessors now play a major role from embedded to high end general-purpose computing. The main goal of Multiprocessors is to achieve *high-end performance, scalability, and reliability*.
+
+#figure(
+  image("figures/big-picture-multiprocessor.png", width: 100%),
+  caption: "Big picture of multiprocessors",
+)
+
+Multiprocessors now play a major role from embedded to high end general-purpose computing. The main goal of Multiprocessors is to achieve *high-end performance, scalability, and reliability*. Multiprocessors focus on exploiting *thread-level parallelism (TLP)*, which is the parallelism that arises from having multiple threads of execution in a program.
 
 Multiprocessors refers to tightly coupled processors whose coordination and usage is controlled by a single operating system and that usually share memory through a shared address space.
 
@@ -1607,19 +1632,6 @@ The physical memory is divided into memory modules distributed on each single pr
 
 Multiprocessor systems can have single address space and distributed physical memory. The concepts of addressing space (single/multiple) and the physical memory organization *orthogonal* to each other.
 
-=== Summary
-#table(
-  columns: (0.6fr, 1fr, 1fr, 1fr),
-  table.header[Aspect][UMA][NUMA][DSM],
-  [Memory Location], [Centralized], [Distributed (per node)], [Distributed (across machines)],
-  [Latency], [Uniform (same for all CPUs)], [Non-uniform (local vs. remote)], [Highly variable (network-bound)],
-  [Scalability], [Low (bus bottleneck)], [High (100s of CPUs)], [Very high (1000s of machines)],
-  [Hardware/Software], [Hardware], [Hardware], [Software abstraction],
-  [Complexity], [Low], [Medium (OS/data-aware apps)], [High (consistency protocols)],
-  [Shared Address Space], [✅ hardware-level], [✅ hardware-level], [✅ software abstraction],
-  [Use Case], [Small SMP systems], [Large servers/HPC], [Distributed compute clusters],
-)
-
 #pagebreak()
 
 == Cache Coherence
@@ -1716,6 +1728,12 @@ A "Write Hit" means CPU-A wants to write to data block X, and X is already prese
 + *Write Hit with `Modified (M)` State:* CPU-A's cache has X in `MODIFIED (M)`; other caches have X in `INVALID (I)` (if copies exist); main memory is stale (due to the "dirty" M state). CPU-A finds X in `MODIFIED` state in its local cache. `MODIFIED` signifies that CPU-A already holds the most recent, exclusive copy of X. Therefore, CPU-A does not need to send any bus transactions (no invalidate requests are necessary as there are no other valid copies). CPU-A directly performs its write operation on the data block X in its local cache, and X's state remains `MODIFIED (M)`. This is the most efficient write scenario, occurring locally without any external bus activity.
 
 === MESI Protocol
+
+#figure(
+  image("figures/MESI-status-transformation.png", width: 80%),
+  caption: "MESI Protocol State Transitions",
+)
+
 The *MESI protocol* is an extension of the MSI protocol, and it's one of the most commonly used and fundamental cache coherence protocols in modern multi-core processors. It adds a new state, *Exclusive (E)*, to the three states of MSI (Modified, Shared, Invalid).
 - *Exclusive (E)*: The cache line exists only in the current CPU's cache; *no other cache has a copy of this cache line*. Its state means that the data in the cache is consistent with the main memory data ("clean"). If the CPU wants to modify a cache line that is in the Exclusive state, it does not need to send an invalidate signal to the bus (because there are no other copies to invalidate). It can directly change its state to Modified and proceed with the modification. This saves bus bandwidth and reduces latency.
 
@@ -1744,7 +1762,7 @@ Responses based on X's state in other caches:
 + *X is in `MODIFIED (M)` state*: CPU-A finds X in `MODIFIED` state in its local cache. `MODIFIED` signifies that CPU-A already holds the most recent, exclusive, and dirty copy of X. Therefore, CPU-A does not need to send any bus transactions. It already has full and exclusive control over the latest data. CPU-A directly performs its write operation on data block X in its local cache. The state of X in CPU-A's cache remains `MODIFIED (M)`.
 
 === Directory Protocols
-A directory protocol is a cache coherence protocol that uses a centralized directory to track the state of each cache line and its copies across multiple caches.
+A _*directory protocol*_ is a cache coherence protocol that uses a centralized directory to track the state of each cache line and its copies across multiple caches.
 
 Each entry in the directory is associated to each block in the main memory (directory size is proportional to the number of memory blocks times the number of processors).
 
