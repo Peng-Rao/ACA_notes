@@ -172,6 +172,12 @@ If the instructions executed in the pipeline are *dependent to each other*, data
 + *Write After Read (WAR) hazard*: This hazard occurs when read of register x by instruction $n+1$ occurs after a write of register x by instruction $n$.
 + *Write After Write (WAW) hazard:* This hazard occurs when write of register x by instruction $n+1$ occurs after a write of register x by instruction $n$.
 
+#tip("Data Hazards in Five Stages Pipeline")[
+  In a classic 5-stage pipeline, only *RAW* hazards naturally occur, while *WAW* and *WAR* hazards do not occur.
+  - No *WAW* hazards because all instructions write their results in the `WB` stage, and they reach `WB` in program order.
+  - No *WAR* hazards because the `ID` stage reads registers in program order, and the `WB` stage writes registers in program order.
+]
+
 === Summary of Data Dependencies
 Data dependency does not directly determine the *number of pipeline stalls*, whether true hazards occur, and how to eliminate them; it depends on how the pipeline handles these dependencies. In other words, the architectural characteristics of the pipeline determine:
 - wether there is a hazard
