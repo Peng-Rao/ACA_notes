@@ -47,4 +47,31 @@ Although preserving control dependence is a simple way to preserve program order
   - *Hazards* are a property of the pipeline architecture, and they are determined by the pipeline structure and how it handles hazards (`stall`, `forwarding`).
 ]
 
+== Multiple Issue Processors
+For *single-issue processors*, scalar processors that fetch and issue max one operation at each clock cycle. For *multiple-issue processors*, scalar processors that fetch and issue multiple operations at each clock cycle.
+
+The *multiple-issue processors* require:
+- *To fetch* multiple instructions in a cycle (higher bandwidth from the instruction cache)
+- *To issue* multiple instructions based on:
+  - *Dynamic scheduling*: The hardware issues at runtime a varying number of instructions at each clock cycle.
+  - *Static scheduling*: The compiler issues statically a fixed number of instructions at each clock cycle.
+
+There are two main types of multiple-issue processors:
+- _*Very Long Instruction Word (VLIW)*_: The compiler statically schedules a fixed number of instructions at each clock cycle, and the hardware executes them in parallel.
+- _*Superscalar*_: The hardware dynamically schedules a varying number of instructions at each clock cycle, based on the available resources and the data dependencies.
+
+#figure(table(
+  columns: 4,
+  stroke: 0.5pt,
+  align: left,
+
+  [*Type*], [*Instruction Scheduling*], [*Complexity*], [*Performance*],
+
+  [VLIW (Static)], [At compile time], [Lower], [Medium],
+
+  [Superscalar (Dynamic)], [At runtime], [Higher], [High],
+))
+
+
+
 #pagebreak()

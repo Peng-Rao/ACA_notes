@@ -170,12 +170,12 @@ Load/Store buffers have *Busy and Address field*. To hold info for memory addres
 
 === Stages of Tomasulo Algorithm
 ==== Issue
-- *Fetch instruction* from the instruction queue (FIFO), maintaining correct data flow.
+- *Fetch instruction* from the *instruction queue* (FIFO), maintaining correct data flow.
 - Check for *structural hazards* (if no RS is available, the instruction stalls).
-- If the operand is in a register, obtain the value directly; If it is not ready, record the source of its producer.
+- If the *operand* is in a register, obtain the value directly; If it is not ready, record the source of its producer.
 - Put the instruction with operands or operands source into a reservation station (RS) associated with the required functional unit (FU).
 
-Instructions are fetched from the head of a *FIFO queue*, ensuring they are issued in program order. This maintains in-order issue even if execution is out-of-order.
+Instructions are fetched from the head of a *FIFO queue*, ensuring they are issued in program order. *This maintains in-order issue even if execution is out-of-order.*
 
 Each instruction requires an available RS. If none are free, the instruction stalls, preventing structural hazards due to limited hardware resources.
 
@@ -203,13 +203,13 @@ Each instruction requires an available RS. If none are free, the instruction sta
   - If multiple instructions targeting the same FU become ready in the same cycle: For `Loads/Stores`, must execute in program order to preserve memory consistency; For Arithmetic/Logical Operations, Can execute out-of-order if the FU supports it.
   - The scheduler typically prioritizes older (earlier-issued) instructions to maintain fairness or program order where required.
 + *RAW Hazard Shortening via Forwarding*:
-  - Operands are sourced *directly from the RS/CDB*, bypassing the Register File (RF). This mimics forwarding, eliminating the wait for RF write-back and reducing RAW resolution latency.
+  - Operands are sourced *directly from the RS/CDB*, bypassing the Register File (RF). This mimics forwarding, eliminating the wait for RF write-back and reducing *RAW* resolution latency.
 + *Execution Completion & CDB Broadcast*:
   - Once execution finishes, the result is *broadcast to all RS entries and the RF via the CDB*.
   - RS entries waiting on this result update their operands, enabling dependent instructions to proceed.
 
 ==== Write result
-When result is available, write it on Common Data Bus and from there into Register File and into all RSs (including store buffers) waiting for this result; Stores also write data to memory unit during this stage (when memory address and result data are available); Mark reservation station available.
+When result is available, write it on *Common Data Bus* and from there into *Register File* and into all RSs (including store buffers) waiting for this result; Stores also write data to memory unit during this stage (when memory address and result data are available); Mark reservation station available.
 
 #pagebreak()
 
@@ -221,7 +221,7 @@ HW-based speculation combines *3 key concepts*:
 + *Speculation* to enable the execution of instructions before the branches are solved by undoing the effects of mispredictions;
 + *Dynamic scheduling* beyond branches.
 #figure(
-  image("../figures/ROB-structure.jpg", width: 80%),
+  image("../figures/ROB-structure.jpg"),
   caption: "The basic structure of a FP unit using Tomasulo's algorithm and extended to handle speculation",
 )
 
@@ -241,7 +241,7 @@ Use *ReOrder Buffer numbers* instead of reservation station numbers as pointers 
 === Speculative Tomasulo
 ==== Issue
 + *Get instruction* from instruction queue
-+ Check if there is an available RS and ROB entry. If either RS or ROB is full, the instruction *stalls*.
++ *Check if there is an available RS and ROB entry.* If either RS or ROB is full, the instruction *stalls*.
 + *Resource Allocation*.
   - For RS: Mark the selected RS as occupied, and load the instruction opcode and operands information.
   - For ROB: Allocate a free entry, and generate a unique ROB ID (e.g., `ROB#5`). Record instruction info (destination register, status, etc.).

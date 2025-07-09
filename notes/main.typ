@@ -9,8 +9,8 @@
   authors: (
     (
       name: "Rao",
-      github: "https://github.com/Raopend",
-      homepage: "https://github.com/Raopend",
+      github: "https://github.com/Peng-Rao",
+      homepage: "https://github.com/Peng-Rao",
     ),
   ),
   affiliations: (
@@ -34,3 +34,9 @@
 #include "chapters/chapter3.typ"
 #include "chapters/chapter4.typ"
 #include "chapters/chapter5.typ"
+#include "chapters/chapter6.typ"
+#include "chapters/chapter7.typ"
+#include "chapters/chapter8.typ"
+#include "chapters/chapter9.typ"
+#include "chapters/chapter10.typ"
+#include "chapters/vector-processor.typ"

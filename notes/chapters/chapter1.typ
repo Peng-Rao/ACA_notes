@@ -65,4 +65,61 @@ j L1              # go to L1
 jr ra             # go to add. contained in ra
 ```
 
+== CPU Performance Evaluation
+=== Clock cycle
+- $T_"CLK"$ = Period or clock cycle time
+- $f_"CLK"$ = Clock frequency = Clock cycles per second
+9
+The relationship between the two is:
+$
+  f_"CLK" = 1 / T_"CLK"
+$
+
+Examples:
+- $f_"CLK"$ = 500 MHz corresponds to $T_"CLK" = 1 / (500 * 10^6) = 2 "ns"$
+- $f_"CLK"$ = 1 GHz corresponds to $T_"CLK" = 1 / (1 * 10^9) = 1 "ns"$
+
+== CPU time
+$
+  "CPU time" = "Clock cycles" * T_"CLK" = "Clock cycles" / f_"CLK"
+$
+To optimize performance means to reduce the execution time (or CPU time):
+- Reduce the number of clock cycles per program
+- Reduce the clock period $T_"CLK"$
+- To increase the clock frequency $f_"CLK"$
+
+The CPU time can also be represented as:
+$
+  "CPU time" = "Instruction count" times "CPI" times T_"CLK"
+$
+where Clock Per Instruction is given by:
+$
+  "CPI" = "Clock cycles" / "Instruction count"
+$
+
+#example("CPU time")[
+  #figure(table(
+    columns: 3,
+    stroke: 1pt,
+    table.header([], [*Frequency*], [*Clock Cycles*]),
+    [*ALU*], [43%], [1],
+    [*Load*], [21%], [4],
+    [*Store*], [12%], [4],
+    [*Branch*], [12%], [2],
+    [*Jump*], [12%], [2],
+  ))
+  Evaluate the CPI and the CPU time to execute a program composed of 100 instructions mixed as in the table by using 500 MHz clock frequency:
+  $
+    "CPI" = 0.43 * 1 + 0.21 * 4 + 0.12 * 4 + 0.12 * 2 + 0.12 * 2 = 2.23
+  $
+  $
+    "CPU time" = "Instruction count" * "CPI" * T_"CLK" = 100 * 2.23 * 2 "ns" = 446 "ns"
+  $
+]
+
+*MIPS (Million Instructions Per Second)* is a measure used to gauge the speed of a computer processor in executing instructions, indicating how many million machine instructions it can execute per second:
+$
+  "MIPS" = "Instruction count" / ("CPU time" times 10^6) = f_"CLK" / ("CPI" times 10^6)
+$
+
 #pagebreak()
